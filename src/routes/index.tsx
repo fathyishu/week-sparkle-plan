@@ -734,10 +734,11 @@ function TrackerApp() {
               id: uid(),
               title: opts.title,
               points: opts.points,
-              status: "pending",
+              status: "pending" as TaskStatus,
               sectionId: opts.sectionId,
               custom: true,
-            },
+            } satisfies Task,
+
           ],
         };
       });
