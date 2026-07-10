@@ -10,10 +10,10 @@ export const Route = createFileRoute("/")({
         content:
           "A 7-day weekly task tracker with points, carry-over, notepads, and bulk actions to plan every day with focus.",
       },
-      { property: "og:title", content: "7-Day Weekly Task Tracker" },
+      { property: "og:title", content: "7-Day Weekly Task Tracker & Daily Planner" },
       {
         property: "og:description",
-        content: "Plan your week, track points, carry incomplete tasks forward.",
+        content: "A 7-day weekly task tracker with points, carry-over, notepads, and bulk actions to plan every day with focus.",
       },
     ],
   }),

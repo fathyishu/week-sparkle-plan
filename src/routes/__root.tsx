@@ -77,14 +77,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "7-Day Weekly Task Tracker & Daily Planner" },
+      { name: "description", content: "A 7-day weekly task tracker with points, carry-over, notepads, and bulk actions to plan every day with focus." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "7-Day Weekly Task Tracker & Daily Planner" },
+      { property: "og:description", content: "A 7-day weekly task tracker with points, carry-over, notepads, and bulk actions to plan every day with focus." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "7-Day Weekly Task Tracker & Daily Planner" },
+      { name: "twitter:description", content: "A 7-day weekly task tracker with points, carry-over, notepads, and bulk actions to plan every day with focus." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/bd10b281-176d-43a1-a88c-448e613d9738" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/bd10b281-176d-43a1-a88c-448e613d9738" },
     ],
     links: [
       {
