@@ -339,7 +339,7 @@ const ONE_TIME_BY_DAY: Record<number, Seed[]> = {
 
 const uid = () => Math.random().toString(36).slice(2, 11);
 
-const MONDAY_JUNE_16 = new Date(2026, 5, 16); // month is 0-indexed
+const MONDAY_JUNE_16 = new Date(2026, 6, 10); // Day 1 = Friday July 10, 2026
 
 const fmtDate = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}`;
 
@@ -430,7 +430,7 @@ function initialState(): AppState {
   };
 }
 
-const STORAGE_KEY = "weekly-tracker-v1";
+const STORAGE_KEY = "weekly-tracker-v2";
 
 /* =========================================================================
    MAIN COMPONENT
