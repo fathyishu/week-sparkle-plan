@@ -62,6 +62,9 @@
 }
 
 :root {
+  --stat-green: oklch(0.68 0.17 145);
+  --stat-purple: oklch(0.55 0.22 295);
+
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.129 0.042 264.695);
