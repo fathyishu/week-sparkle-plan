@@ -430,7 +430,7 @@ function initialState(): AppState {
   };
 }
 
-const STORAGE_KEY = "weekly-tracker-v1";
+const STORAGE_KEY = "weekly-tracker-v2";
 
 /* =========================================================================
    MAIN COMPONENT
