@@ -447,22 +447,37 @@ const STORAGE_KEY = "weekly-tracker-v2";
    MAIN COMPONENT
    ========================================================================= */
 
-function TrackerApp() {
+interface TrackerProps {
+  user: User;
+  signOut: () => Promise<void>;
+}
+
+function TrackerApp({ user, signOut }: TrackerProps) {
   const [state, setState] = useState<AppState>(initialState);
   const [hydrated, setHydrated] = useState(false);
+  const [cloudReady, setCloudReady] = useState(false);
   const [activeDay, setActiveDay] = useState(1); // 1-indexed
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(`${STORAGE_KEY}:${user.id}`);
       if (raw) setState(JSON.parse(raw));
     } catch {
       /* ignore */
     }
     setHydrated(true);
-  }, []);
+  }, [user.id]);
+
+  const { status: syncStatus, online, remotePulse } = useCloudSync<AppState>({
+    userId: user.id,
+    state,
+    setState,
+    hydrated,
+    ready: cloudReady,
+    onReady: () => setCloudReady(true),
+  });
 
   useEffect(() => {
     if (!hydrated) return;
