@@ -127,7 +127,7 @@ export function useCloudSync<T>({
       setStatus("saving");
       const { error } = await supabase
         .from("user_app_state")
-        .upsert({ user_id: userId, data: pendingRef.current as unknown as object });
+        .upsert({ user_id: userId, data: pendingRef.current as never });
       if (error) {
         console.error("[cloud-sync] save error", error);
         setStatus("error");
@@ -170,7 +170,7 @@ export function useCloudSync<T>({
         const parsed = JSON.parse(queued) as T;
         const { error } = await supabase
           .from("user_app_state")
-          .upsert({ user_id: userId, data: parsed as unknown as object });
+          .upsert({ user_id: userId, data: parsed as never });
         if (!error) {
           lastRemoteHash.current = queued;
           localStorage.removeItem(`cloud-queue:${userId}`);
