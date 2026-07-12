@@ -14,7 +14,261 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      carryovers: {
+        Row: {
+          deleted: boolean
+          from_day: number
+          id: string
+          orig_key: string
+          pts: number
+          state: number
+          text: string
+          to_day: number
+          updated_at: string
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          deleted?: boolean
+          from_day: number
+          id?: string
+          orig_key: string
+          pts?: number
+          state?: number
+          text: string
+          to_day: number
+          updated_at?: string
+          user_id: string
+          week_start: string
+        }
+        Update: {
+          deleted?: boolean
+          from_day?: number
+          id?: string
+          orig_key?: string
+          pts?: number
+          state?: number
+          text?: string
+          to_day?: number
+          updated_at?: string
+          user_id?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
+      custom_sections: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          label: string
+          section_id: string
+          user_id: string
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          id?: string
+          label: string
+          section_id: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          label?: string
+          section_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      custom_tasks: {
+        Row: {
+          daily: boolean
+          day_number: number
+          deleted: boolean
+          from_day: number | null
+          id: string
+          pts: number
+          section_id: string
+          state: number
+          text: string
+          updated_at: string
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          daily?: boolean
+          day_number: number
+          deleted?: boolean
+          from_day?: number | null
+          id?: string
+          pts?: number
+          section_id: string
+          state?: number
+          text: string
+          updated_at?: string
+          user_id: string
+          week_start: string
+        }
+        Update: {
+          daily?: boolean
+          day_number?: number
+          deleted?: boolean
+          from_day?: number | null
+          id?: string
+          pts?: number
+          section_id?: string
+          state?: number
+          text?: string
+          updated_at?: string
+          user_id?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
+      notepad_items: {
+        Row: {
+          day_number: number
+          deleted: boolean
+          from_day: number | null
+          id: string
+          pts: number
+          state: number
+          text: string
+          updated_at: string
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          day_number: number
+          deleted?: boolean
+          from_day?: number | null
+          id?: string
+          pts?: number
+          state?: number
+          text: string
+          updated_at?: string
+          user_id: string
+          week_start: string
+        }
+        Update: {
+          day_number?: number
+          deleted?: boolean
+          from_day?: number | null
+          id?: string
+          pts?: number
+          state?: number
+          text?: string
+          updated_at?: string
+          user_id?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
+      task_states: {
+        Row: {
+          day_number: number
+          deleted: boolean
+          id: string
+          state: number
+          task_key: string
+          updated_at: string
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          day_number: number
+          deleted?: boolean
+          id?: string
+          state?: number
+          task_key: string
+          updated_at?: string
+          user_id: string
+          week_start: string
+        }
+        Update: {
+          day_number?: number
+          deleted?: boolean
+          id?: string
+          state?: number
+          task_key?: string
+          updated_at?: string
+          user_id?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
+      week_history: {
+        Row: {
+          created_at: string
+          date_range: string
+          done: number
+          id: string
+          pts_done: number
+          pts_pct: number
+          pts_total: number
+          task_pct: number
+          total: number
+          user_id: string
+          week_number: number
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          date_range: string
+          done?: number
+          id?: string
+          pts_done?: number
+          pts_pct?: number
+          pts_total?: number
+          task_pct?: number
+          total?: number
+          user_id: string
+          week_number: number
+          week_start: string
+        }
+        Update: {
+          created_at?: string
+          date_range?: string
+          done?: number
+          id?: string
+          pts_done?: number
+          pts_pct?: number
+          pts_total?: number
+          task_pct?: number
+          total?: number
+          user_id?: string
+          week_number?: number
+          week_start?: string
+        }
+        Relationships: []
+      }
+      week_start_preference: {
+        Row: {
+          current_week_start: string
+          id: string
+          updated_at: string
+          user_id: string
+          week_number: number
+        }
+        Insert: {
+          current_week_start: string
+          id?: string
+          updated_at?: string
+          user_id: string
+          week_number?: number
+        }
+        Update: {
+          current_week_start?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+          week_number?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
