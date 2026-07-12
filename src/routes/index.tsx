@@ -1,5 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import type { User } from "@supabase/supabase-js";
+import { AuthGate } from "@/components/AuthGate";
+import { useCloudSync } from "@/hooks/useCloudSync";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -17,8 +20,16 @@ export const Route = createFileRoute("/")({
       },
     ],
   }),
-  component: TrackerApp,
+  component: RouteRoot,
 });
+
+function RouteRoot() {
+  return (
+    <AuthGate>
+      {({ user, signOut }) => <TrackerApp user={user} signOut={signOut} />}
+    </AuthGate>
+  );
+}
 
 /* =========================================================================
    TYPES
