@@ -818,21 +818,88 @@ function TrackerApp({ user, signOut }: TrackerProps) {
     }
   };
 
-  if (!hydrated) {
-    return <div className="min-h-screen bg-background" />;
+  if (!hydrated || !cloudReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-xs text-muted-foreground">Loading your tasks…</p>
+        </div>
+      </div>
+    );
   }
+
+  const displayName =
+    (user.user_metadata?.full_name as string | undefined) ??
+    (user.user_metadata?.name as string | undefined) ??
+    user.email ??
+    "Account";
+  const avatarUrl =
+    (user.user_metadata?.avatar_url as string | undefined) ??
+    (user.user_metadata?.picture as string | undefined);
+
+  const syncLabel =
+    syncStatus === "saving"
+      ? "Saving…"
+      : syncStatus === "saved"
+        ? "Synced ✓"
+        : syncStatus === "offline"
+          ? "Offline"
+          : syncStatus === "error"
+            ? "Sync error"
+            : syncStatus === "loading"
+              ? "Loading"
+              : "Up to date";
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {!online && (
+        <div className="w-full bg-amber-500 px-4 py-1.5 text-center text-xs font-medium text-white">
+          Offline — changes will sync when reconnected
+        </div>
+      )}
       <div className="mx-auto max-w-5xl px-4 py-6 sm:py-10">
-        <header className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Weekly Task Tracker
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Week {state.weekNumber} · {fmtDate(new Date(state.days[0].isoDate))} –{" "}
-            {fmtDate(new Date(state.days[6].isoDate))}
-          </p>
+        <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+              Weekly Task Tracker
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Week {state.weekNumber} · {fmtDate(new Date(state.days[0].isoDate))} –{" "}
+              {fmtDate(new Date(state.days[6].isoDate))}
+            </p>
+            <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+              <span
+                key={remotePulse}
+                className={`inline-block h-2 w-2 rounded-full ${
+                  remotePulse > 0 ? "animate-ping-fast bg-green-500" : "bg-muted-foreground/30"
+                }`}
+                title="Realtime sync"
+              />
+              <span>{syncLabel}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1 shadow-sm">
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={displayName}
+                className="h-8 w-8 rounded-full"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-xs font-semibold">
+                {displayName.slice(0, 1).toUpperCase()}
+              </div>
+            )}
+            <span className="max-w-[140px] truncate text-xs font-medium">{displayName}</span>
+            <button
+              onClick={signOut}
+              className="rounded-full border border-input bg-background px-3 py-1 text-xs font-medium transition hover:bg-accent"
+            >
+              Sign out
+            </button>
+          </div>
         </header>
 
         {/* Global stats */}
