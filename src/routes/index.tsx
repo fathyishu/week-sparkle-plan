@@ -482,11 +482,11 @@ function TrackerApp({ user, signOut }: TrackerProps) {
   useEffect(() => {
     if (!hydrated) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(`${STORAGE_KEY}:${user.id}`, JSON.stringify(state));
     } catch {
       /* ignore */
     }
-  }, [state, hydrated]);
+  }, [state, hydrated, user.id]);
 
   useEffect(() => {
     setSelected(new Set());
