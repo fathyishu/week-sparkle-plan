@@ -7,13 +7,13 @@ import { useCloudSync } from "@/hooks/useCloudSync";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "7-Day Weekly Task Tracker & Daily Planner" },
+      { title: "7 Day Weekly Task Tracker & Daily Planner" },
       {
         name: "description",
         content:
           "A 7-day weekly task tracker with points, carry-over, notepads, and bulk actions to plan every day with focus.",
       },
-      { property: "og:title", content: "7-Day Weekly Task Tracker & Daily Planner" },
+      { property: "og:title", content: "7 Day Weekly Task Tracker & Daily Planner" },
       {
         property: "og:description",
         content: "A 7-day weekly task tracker with points, carry-over, notepads, and bulk actions to plan every day with focus.",
