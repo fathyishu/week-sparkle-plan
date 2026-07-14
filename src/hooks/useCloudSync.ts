@@ -69,6 +69,19 @@ export function useCloudSync<T>({
         } catch (e) {
           console.error("[cloud-sync] parse error", e);
         }
+      } else if (buildFirstTime) {
+        // Brand-new user — seed with starter (demo) data and persist it
+        try {
+          const seed = buildFirstTime();
+          setState(seed);
+          const seedJson = JSON.stringify(seed);
+          const { error: seedErr } = await supabase
+            .from("user_app_state")
+            .upsert({ user_id: userId, data: seed as never });
+          if (!seedErr) lastRemoteHash.current = seedJson;
+        } catch (e) {
+          console.error("[cloud-sync] seed error", e);
+        }
       }
       setStatus("idle");
       onReady();
