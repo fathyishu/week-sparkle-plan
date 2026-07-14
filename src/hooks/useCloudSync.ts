@@ -20,6 +20,7 @@ export function useCloudSync<T>({
   hydrated,
   ready,
   onReady,
+  buildFirstTime,
 }: UseCloudSyncArgs<T>) {
   const [status, setStatus] = useState<SyncStatus>("loading");
   const [online, setOnline] = useState(
