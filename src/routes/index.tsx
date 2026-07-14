@@ -1152,7 +1152,9 @@ function TrackerApp({ user, signOut }: TrackerProps) {
           </div>
         </div>
       </div>
-    </div>
+        </>
+      )}
+    </AppShell>
   );
 }
 
