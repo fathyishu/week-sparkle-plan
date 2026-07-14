@@ -83,6 +83,10 @@ interface AppState {
   weekNumber: number;
   days: DayData[];
   history: WeekHistory[];
+  ui?: {
+    isDemo?: boolean;
+    demoBannerDismissed?: boolean;
+  };
 }
 
 /* =========================================================================
