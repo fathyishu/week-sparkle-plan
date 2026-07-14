@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { AuthGate } from "@/components/AuthGate";
 import { useCloudSync } from "@/hooks/useCloudSync";
+import { AppShell, type AppView } from "@/components/AppShell";
+import { GroupsView } from "@/components/groups/GroupsView";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -83,6 +85,10 @@ interface AppState {
   weekNumber: number;
   days: DayData[];
   history: WeekHistory[];
+  ui?: {
+    isDemo?: boolean;
+    demoBannerDismissed?: boolean;
+  };
 }
 
 /* =========================================================================
@@ -441,6 +447,89 @@ function initialState(): AppState {
   };
 }
 
+/* Demo starter template shown to first-time users */
+const DEMO_SECTIONS: Section[] = [
+  { id: "demo-morning", label: "Morning Routine", color: "#D4537E" },
+  { id: "demo-sleep", label: "Sleep & Recovery", color: "#378ADD" },
+  { id: "demo-exercise", label: "Exercise & Health", color: "#639922" },
+  { id: "demo-personal", label: "Personal Development", color: "#7F77DD" },
+  { id: "demo-deen", label: "Deen & Personal Development", color: "#BA7517" },
+];
+
+const DEMO_TASKS: Record<string, [string, number][]> = {
+  "demo-morning": [
+    ["Get up at 4:00 AM", 4],
+    ["Drink a full glass of water immediately", 3],
+    ["10 min journaling or planning your day", 4],
+    ["Read for 20 minutes", 4],
+  ],
+  "demo-sleep": [
+    ["Sleep by 10:00 PM", 5],
+    ["No screen time 30 min before bed", 4],
+    ["Prepare tomorrow's clothes and bag", 3],
+  ],
+  "demo-exercise": [
+    ["Do a 1-hour workout", 5],
+    ["Post-workout stretch 10 min", 3],
+    ["Track calories or meals today", 3],
+  ],
+  "demo-personal": [
+    ["Learn something new for 30 min", 5],
+    ["Listen to a podcast or audiobook", 4],
+    ["Review your goals for the week", 4],
+  ],
+  "demo-deen": [
+    ["Learn something new for 30 min", 5],
+    ["Listen to a podcast or audiobook", 4],
+    ["Review your goals for the week", 4],
+    ["Listen to Islamic class Dars for 30 minutes", 7],
+    ["Fajr prayer", 6],
+    ["Tahajjud", 10],
+    ["Workout — 40 pushups total", 4],
+    ["Recite five pages of the Quran and memorize two ayahs", 6],
+  ],
+};
+
+function buildDemoWeek(mondayISO: string): DayData[] {
+  const monday = new Date(mondayISO);
+  const days: DayData[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const tasks: Task[] = [];
+    for (const sec of DEMO_SECTIONS) {
+      for (const [title, points] of DEMO_TASKS[sec.id] ?? []) {
+        tasks.push({
+          id: uid(),
+          title,
+          points,
+          status: "pending",
+          sectionId: sec.id,
+          custom: true,
+        });
+      }
+    }
+    days.push({
+      date: fmtDate(d),
+      isoDate: d.toISOString(),
+      sections: [...DEMO_SECTIONS],
+      tasks,
+      notes: [],
+    });
+  }
+  return days;
+}
+
+function buildDemoState(): AppState {
+  return {
+    weekStartISO: MONDAY_JUNE_16.toISOString(),
+    weekNumber: 1,
+    days: buildDemoWeek(MONDAY_JUNE_16.toISOString()),
+    history: [],
+    ui: { isDemo: true, demoBannerDismissed: false },
+  };
+}
+
 const STORAGE_KEY = "weekly-tracker-v2";
 
 /* =========================================================================
@@ -477,7 +566,10 @@ function TrackerApp({ user, signOut }: TrackerProps) {
     hydrated,
     ready: cloudReady,
     onReady: () => setCloudReady(true),
+    buildFirstTime: buildDemoState,
   });
+
+  const [view, setView] = useState<AppView>("personal");
 
   useEffect(() => {
     if (!hydrated) return;
@@ -852,12 +944,38 @@ function TrackerApp({ user, signOut }: TrackerProps) {
               : "Up to date";
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {!online && (
-        <div className="w-full bg-amber-500 px-4 py-1.5 text-center text-xs font-medium text-white">
-          Offline — changes will sync when reconnected
-        </div>
-      )}
+    <AppShell view={view} setView={setView} user={user}>
+      {view === "groups" ? (
+        <GroupsView user={user} />
+      ) : (
+        <>
+          {!online && (
+            <div className="w-full bg-amber-500 px-4 py-1.5 text-center text-xs font-medium text-white">
+              Offline — changes will sync when reconnected
+            </div>
+          )}
+          {state.ui?.isDemo && !state.ui?.demoBannerDismissed && (
+            <div className="mx-auto max-w-5xl px-4 pt-4">
+              <div className="flex items-start gap-3 rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm">
+                <span className="text-lg">👋</span>
+                <p className="flex-1">
+                  Welcome! These are sample tasks to get you started. Add your own
+                  tasks or delete these anytime.
+                </p>
+                <button
+                  onClick={() =>
+                    setState((s) => ({
+                      ...s,
+                      ui: { ...(s.ui ?? {}), demoBannerDismissed: true },
+                    }))
+                  }
+                  className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-muted"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
       <div className="mx-auto max-w-5xl px-4 py-6 sm:py-10">
         <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -1034,7 +1152,9 @@ function TrackerApp({ user, signOut }: TrackerProps) {
           </div>
         </div>
       </div>
-    </div>
+        </>
+      )}
+    </AppShell>
   );
 }
 

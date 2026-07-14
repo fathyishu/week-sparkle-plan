@@ -128,6 +128,244 @@ export type Database = {
         }
         Relationships: []
       }
+      group_invitations: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          invited_by: string
+          invited_email: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          invited_by: string
+          invited_email: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          invited_by?: string
+          invited_email?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_invitations_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_members: {
+        Row: {
+          avatar_url: string | null
+          display_name: string | null
+          email: string | null
+          group_id: string
+          id: string
+          joined_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          display_name?: string | null
+          email?: string | null
+          group_id: string
+          id?: string
+          joined_at?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          display_name?: string | null
+          email?: string | null
+          group_id?: string
+          id?: string
+          joined_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_sections: {
+        Row: {
+          color: string
+          created_at: string
+          group_id: string
+          id: string
+          label: string
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          group_id: string
+          id?: string
+          label: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          group_id?: string
+          id?: string
+          label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_sections_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_tasks: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          created_by: string
+          deleted: boolean
+          description: string | null
+          due_date: string | null
+          group_id: string
+          id: string
+          position: number
+          priority: string
+          pts: number
+          section_id: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by: string
+          deleted?: boolean
+          description?: string | null
+          due_date?: string | null
+          group_id: string
+          id?: string
+          position?: number
+          priority?: string
+          pts?: number
+          section_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string
+          deleted?: boolean
+          description?: string | null
+          due_date?: string | null
+          group_id?: string
+          id?: string
+          position?: number
+          priority?: string
+          pts?: number
+          section_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_tasks_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_weekly_points: {
+        Row: {
+          group_id: string
+          id: string
+          points: number
+          tasks_done: number
+          updated_at: string
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          group_id: string
+          id?: string
+          points?: number
+          tasks_done?: number
+          updated_at?: string
+          user_id: string
+          week_start: string
+        }
+        Update: {
+          group_id?: string
+          id?: string
+          points?: number
+          tasks_done?: number
+          updated_at?: string
+          user_id?: string
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_weekly_points_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      groups: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notepad_items: {
         Row: {
           day_number: number
@@ -292,7 +530,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_group_member: {
+        Args: { _group: string; _user: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

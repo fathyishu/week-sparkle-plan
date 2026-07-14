@@ -10,6 +10,7 @@ interface UseCloudSyncArgs<T> {
   hydrated: boolean;
   ready: boolean; // set true after cloud hydration completes
   onReady: () => void;
+  buildFirstTime?: () => T;
 }
 
 export function useCloudSync<T>({
@@ -19,6 +20,7 @@ export function useCloudSync<T>({
   hydrated,
   ready,
   onReady,
+  buildFirstTime,
 }: UseCloudSyncArgs<T>) {
   const [status, setStatus] = useState<SyncStatus>("loading");
   const [online, setOnline] = useState(
@@ -66,6 +68,19 @@ export function useCloudSync<T>({
           setState(remote);
         } catch (e) {
           console.error("[cloud-sync] parse error", e);
+        }
+      } else if (buildFirstTime) {
+        // Brand-new user — seed with starter (demo) data and persist it
+        try {
+          const seed = buildFirstTime();
+          setState(seed);
+          const seedJson = JSON.stringify(seed);
+          const { error: seedErr } = await supabase
+            .from("user_app_state")
+            .upsert({ user_id: userId, data: seed as never });
+          if (!seedErr) lastRemoteHash.current = seedJson;
+        } catch (e) {
+          console.error("[cloud-sync] seed error", e);
         }
       }
       setStatus("idle");
