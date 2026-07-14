@@ -566,7 +566,10 @@ function TrackerApp({ user, signOut }: TrackerProps) {
     hydrated,
     ready: cloudReady,
     onReady: () => setCloudReady(true),
+    buildFirstTime: buildDemoState,
   });
+
+  const [view, setView] = useState<AppView>("personal");
 
   useEffect(() => {
     if (!hydrated) return;
