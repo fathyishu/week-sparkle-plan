@@ -10,6 +10,7 @@ interface UseCloudSyncArgs<T> {
   hydrated: boolean;
   ready: boolean; // set true after cloud hydration completes
   onReady: () => void;
+  buildFirstTime?: () => T;
 }
 
 export function useCloudSync<T>({
