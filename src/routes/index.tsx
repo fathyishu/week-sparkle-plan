@@ -445,6 +445,89 @@ function initialState(): AppState {
   };
 }
 
+/* Demo starter template shown to first-time users */
+const DEMO_SECTIONS: Section[] = [
+  { id: "demo-morning", label: "Morning Routine", color: "#D4537E" },
+  { id: "demo-sleep", label: "Sleep & Recovery", color: "#378ADD" },
+  { id: "demo-exercise", label: "Exercise & Health", color: "#639922" },
+  { id: "demo-personal", label: "Personal Development", color: "#7F77DD" },
+  { id: "demo-deen", label: "Deen & Personal Development", color: "#BA7517" },
+];
+
+const DEMO_TASKS: Record<string, [string, number][]> = {
+  "demo-morning": [
+    ["Get up at 4:00 AM", 4],
+    ["Drink a full glass of water immediately", 3],
+    ["10 min journaling or planning your day", 4],
+    ["Read for 20 minutes", 4],
+  ],
+  "demo-sleep": [
+    ["Sleep by 10:00 PM", 5],
+    ["No screen time 30 min before bed", 4],
+    ["Prepare tomorrow's clothes and bag", 3],
+  ],
+  "demo-exercise": [
+    ["Do a 1-hour workout", 5],
+    ["Post-workout stretch 10 min", 3],
+    ["Track calories or meals today", 3],
+  ],
+  "demo-personal": [
+    ["Learn something new for 30 min", 5],
+    ["Listen to a podcast or audiobook", 4],
+    ["Review your goals for the week", 4],
+  ],
+  "demo-deen": [
+    ["Learn something new for 30 min", 5],
+    ["Listen to a podcast or audiobook", 4],
+    ["Review your goals for the week", 4],
+    ["Listen to Islamic class Dars for 30 minutes", 7],
+    ["Fajr prayer", 6],
+    ["Tahajjud", 10],
+    ["Workout — 40 pushups total", 4],
+    ["Recite five pages of the Quran and memorize two ayahs", 6],
+  ],
+};
+
+function buildDemoWeek(mondayISO: string): DayData[] {
+  const monday = new Date(mondayISO);
+  const days: DayData[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const tasks: Task[] = [];
+    for (const sec of DEMO_SECTIONS) {
+      for (const [title, points] of DEMO_TASKS[sec.id] ?? []) {
+        tasks.push({
+          id: uid(),
+          title,
+          points,
+          status: "pending",
+          sectionId: sec.id,
+          custom: true,
+        });
+      }
+    }
+    days.push({
+      date: fmtDate(d),
+      isoDate: d.toISOString(),
+      sections: [...DEMO_SECTIONS],
+      tasks,
+      notes: [],
+    });
+  }
+  return days;
+}
+
+function buildDemoState(): AppState {
+  return {
+    weekStartISO: MONDAY_JUNE_16.toISOString(),
+    weekNumber: 1,
+    days: buildDemoWeek(MONDAY_JUNE_16.toISOString()),
+    history: [],
+    ui: { isDemo: true, demoBannerDismissed: false },
+  };
+}
+
 const STORAGE_KEY = "weekly-tracker-v2";
 
 /* =========================================================================
