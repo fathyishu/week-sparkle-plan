@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { AuthGate } from "@/components/AuthGate";
 import { useCloudSync } from "@/hooks/useCloudSync";
+import { AppShell, type AppView } from "@/components/AppShell";
+import { GroupsView } from "@/components/groups/GroupsView";
 
 export const Route = createFileRoute("/")({
   head: () => ({
