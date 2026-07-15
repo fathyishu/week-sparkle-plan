@@ -328,7 +328,7 @@ function MenteeDashboard({
       const { data, error } = await supabase
         .from("user_app_state")
         .select("data")
-        .eq("user_id", mentorship.mentee_id)
+        .eq("user_id", mentorship.mentee_id!)
         .maybeSingle();
       if (cancel) return;
       if (error) setErr(error.message);
