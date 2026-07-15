@@ -80,8 +80,15 @@ function isoMondayOf(d = new Date()): string {
 }
 
 /* ================================================================== */
-export function GroupsView({ user }: { user: User }) {
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+export function GroupsView({
+  user,
+  selectedGroupId,
+  setSelectedGroupId,
+}: {
+  user: User;
+  selectedGroupId: string | null;
+  setSelectedGroupId: (id: string | null) => void;
+}) {
   const [groups, setGroups] = useState<GroupRow[]>([]);
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({});
   const [taskCounts, setTaskCounts] = useState<Record<string, number>>({});
