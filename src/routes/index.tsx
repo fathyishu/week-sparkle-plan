@@ -945,9 +945,23 @@ function TrackerApp({ user, signOut }: TrackerProps) {
               : "Up to date";
 
   return (
-    <AppShell view={view} setView={setView} user={user}>
+    <AppShell
+      view={view}
+      setView={setView}
+      user={user}
+      selectedGroupId={selectedGroupId}
+      setSelectedGroupId={setSelectedGroupId}
+    >
       {view === "groups" ? (
-        <GroupsView user={user} />
+        <GroupsView
+          user={user}
+          selectedGroupId={selectedGroupId}
+          setSelectedGroupId={setSelectedGroupId}
+        />
+      ) : view === "notifications" ? (
+        <NotificationsView user={user} />
+      ) : view === "mentors" ? (
+        <MentorView user={user} />
       ) : (
         <>
           {!online && (
