@@ -61,7 +61,7 @@ export function AppShell({
           : Promise.resolve({ count: 0 } as { count: number | null }),
       ]);
       if (cancel) return;
-      setGroups(((gs ?? []) as SidebarGroup[]) ?? []);
+      setGroups((gs ?? []) as SidebarGroup[]);
       setInviteCount((invRes as { count: number | null }).count ?? 0);
       setMentorReqCount((mentRes as { count: number | null }).count ?? 0);
     };
