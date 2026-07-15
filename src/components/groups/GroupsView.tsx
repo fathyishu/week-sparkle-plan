@@ -405,20 +405,56 @@ function GroupDetail({
   isOwner: boolean;
   onBack: () => void;
 }) {
-  const [tab, setTab] = useState<"board" | "members" | "sections" | "leaderboard">("board");
+  const [tab, setTab] = useState<"tasks" | "members" | "sections" | "leaderboard">("tasks");
+  const [taskMode, setTaskMode] = useState<"individual" | "board">("individual");
+  const [showInvite, setShowInvite] = useState(false);
+  const [showAddTask, setShowAddTask] = useState(false);
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
-      <div className="mb-4 flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-muted"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> Back
-        </button>
-        <h1 className="text-xl font-bold sm:text-2xl">{groupName}</h1>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-muted"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Back
+          </button>
+          <h1 className="text-xl font-bold sm:text-2xl">{groupName}</h1>
+        </div>
+        {tab === "tasks" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex overflow-hidden rounded-md border border-border">
+              {(["individual", "board"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setTaskMode(m)}
+                  className={`px-3 py-1.5 text-xs font-medium capitalize ${
+                    taskMode === m
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-card text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {m === "individual" ? "Individual View" : "Board View"}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowAddTask(true)}
+              className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Task
+            </button>
+            <button
+              onClick={() => setShowInvite(true)}
+              className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+            >
+              <UserPlus className="h-3.5 w-3.5" /> Add People
+            </button>
+          </div>
+        )}
       </div>
       <div className="mb-4 flex gap-1 border-b border-border">
-        {(["board", "members", "sections", "leaderboard"] as const).map((t) => (
+        {(["tasks", "members", "sections", "leaderboard"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -432,10 +468,30 @@ function GroupDetail({
           </button>
         ))}
       </div>
-      {tab === "board" && <GroupBoard user={user} groupId={groupId} />}
+      {tab === "tasks" && taskMode === "board" && (
+        <GroupBoard user={user} groupId={groupId} />
+      )}
+      {tab === "tasks" && taskMode === "individual" && (
+        <GroupIndividual user={user} groupId={groupId} />
+      )}
       {tab === "members" && <GroupMembers user={user} groupId={groupId} isOwner={isOwner} />}
       {tab === "sections" && <GroupSections groupId={groupId} isOwner={isOwner} />}
       {tab === "leaderboard" && <GroupLeaderboard groupId={groupId} />}
+
+      {showInvite && (
+        <InviteModal
+          user={user}
+          groupId={groupId}
+          onClose={() => setShowInvite(false)}
+        />
+      )}
+      {showAddTask && (
+        <QuickAddTaskModal
+          user={user}
+          groupId={groupId}
+          onClose={() => setShowAddTask(false)}
+        />
+      )}
     </div>
   );
 }
