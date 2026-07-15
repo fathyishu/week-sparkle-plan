@@ -366,6 +366,48 @@ export type Database = {
         }
         Relationships: []
       }
+      mentorships: {
+        Row: {
+          created_at: string
+          id: string
+          mentee_avatar: string | null
+          mentee_email: string
+          mentee_id: string | null
+          mentee_name: string | null
+          mentor_avatar: string | null
+          mentor_id: string
+          mentor_name: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mentee_avatar?: string | null
+          mentee_email: string
+          mentee_id?: string | null
+          mentee_name?: string | null
+          mentor_avatar?: string | null
+          mentor_id: string
+          mentor_name?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mentee_avatar?: string | null
+          mentee_email?: string
+          mentee_id?: string | null
+          mentee_name?: string | null
+          mentor_avatar?: string | null
+          mentor_id?: string
+          mentor_name?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notepad_items: {
         Row: {
           day_number: number
@@ -402,6 +444,54 @@ export type Database = {
           updated_at?: string
           user_id?: string
           week_start?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          actor_id: string | null
+          actor_name: string | null
+          body: string | null
+          created_at: string
+          handled: boolean
+          id: string
+          kind: string
+          read: boolean
+          ref_group_id: string | null
+          ref_invitation_id: string | null
+          ref_mentorship_id: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_name?: string | null
+          body?: string | null
+          created_at?: string
+          handled?: boolean
+          id?: string
+          kind: string
+          read?: boolean
+          ref_group_id?: string | null
+          ref_invitation_id?: string | null
+          ref_mentorship_id?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_name?: string | null
+          body?: string | null
+          created_at?: string
+          handled?: boolean
+          id?: string
+          kind?: string
+          read?: boolean
+          ref_group_id?: string | null
+          ref_invitation_id?: string | null
+          ref_mentorship_id?: string | null
+          title?: string
+          user_id?: string
         }
         Relationships: []
       }
