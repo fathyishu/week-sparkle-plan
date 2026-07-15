@@ -80,8 +80,15 @@ function isoMondayOf(d = new Date()): string {
 }
 
 /* ================================================================== */
-export function GroupsView({ user }: { user: User }) {
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+export function GroupsView({
+  user,
+  selectedGroupId,
+  setSelectedGroupId,
+}: {
+  user: User;
+  selectedGroupId: string | null;
+  setSelectedGroupId: (id: string | null) => void;
+}) {
   const [groups, setGroups] = useState<GroupRow[]>([]);
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({});
   const [taskCounts, setTaskCounts] = useState<Record<string, number>>({});
@@ -398,20 +405,56 @@ function GroupDetail({
   isOwner: boolean;
   onBack: () => void;
 }) {
-  const [tab, setTab] = useState<"board" | "members" | "sections" | "leaderboard">("board");
+  const [tab, setTab] = useState<"tasks" | "members" | "sections" | "leaderboard">("tasks");
+  const [taskMode, setTaskMode] = useState<"individual" | "board">("individual");
+  const [showInvite, setShowInvite] = useState(false);
+  const [showAddTask, setShowAddTask] = useState(false);
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
-      <div className="mb-4 flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-muted"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> Back
-        </button>
-        <h1 className="text-xl font-bold sm:text-2xl">{groupName}</h1>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-muted"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Back
+          </button>
+          <h1 className="text-xl font-bold sm:text-2xl">{groupName}</h1>
+        </div>
+        {tab === "tasks" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex overflow-hidden rounded-md border border-border">
+              {(["individual", "board"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setTaskMode(m)}
+                  className={`px-3 py-1.5 text-xs font-medium capitalize ${
+                    taskMode === m
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-card text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {m === "individual" ? "Individual View" : "Board View"}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowAddTask(true)}
+              className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Task
+            </button>
+            <button
+              onClick={() => setShowInvite(true)}
+              className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+            >
+              <UserPlus className="h-3.5 w-3.5" /> Add People
+            </button>
+          </div>
+        )}
       </div>
       <div className="mb-4 flex gap-1 border-b border-border">
-        {(["board", "members", "sections", "leaderboard"] as const).map((t) => (
+        {(["tasks", "members", "sections", "leaderboard"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -425,10 +468,30 @@ function GroupDetail({
           </button>
         ))}
       </div>
-      {tab === "board" && <GroupBoard user={user} groupId={groupId} />}
+      {tab === "tasks" && taskMode === "board" && (
+        <GroupBoard user={user} groupId={groupId} />
+      )}
+      {tab === "tasks" && taskMode === "individual" && (
+        <GroupIndividual user={user} groupId={groupId} />
+      )}
       {tab === "members" && <GroupMembers user={user} groupId={groupId} isOwner={isOwner} />}
       {tab === "sections" && <GroupSections groupId={groupId} isOwner={isOwner} />}
       {tab === "leaderboard" && <GroupLeaderboard groupId={groupId} />}
+
+      {showInvite && (
+        <InviteModal
+          user={user}
+          groupId={groupId}
+          onClose={() => setShowInvite(false)}
+        />
+      )}
+      {showAddTask && (
+        <QuickAddTaskModal
+          user={user}
+          groupId={groupId}
+          onClose={() => setShowAddTask(false)}
+        />
+      )}
     </div>
   );
 }
@@ -1195,6 +1258,261 @@ function Modal({
         <h2 className="mb-4 text-lg font-semibold">{title}</h2>
         {children}
       </div>
+    </div>
+  );
+}
+
+/* ================================================================== */
+function QuickAddTaskModal({
+  user,
+  groupId,
+  onClose,
+}: {
+  user: User;
+  groupId: string;
+  onClose: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [pts, setPts] = useState(5);
+  const [priority, setPriority] = useState<TaskRow["priority"]>("medium");
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (!title.trim()) return;
+    setBusy(true);
+    const { error } = await supabase.from("group_tasks").insert({
+      group_id: groupId,
+      title: title.trim(),
+      created_by: user.id,
+      status: "todo",
+      pts,
+      priority,
+      position: 0,
+    });
+    setBusy(false);
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    onClose();
+  };
+  return (
+    <Modal onClose={onClose} title="Add Task">
+      <div className="space-y-3">
+        <input
+          autoFocus
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="What needs doing?"
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+        />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium">Priority</label>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as TaskRow["priority"])}
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium">Points</label>
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={pts}
+              onChange={(e) => setPts(Number(e.target.value) || 1)}
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <button onClick={onClose} className="rounded-md border border-border px-3 py-1.5 text-sm">
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={busy || !title.trim()}
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          >
+            Add
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/* ================================================================== */
+function GroupIndividual({ user, groupId }: { user: User; groupId: string }) {
+  const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [members, setMembers] = useState<MemberRow[]>([]);
+  const [editing, setEditing] = useState<TaskRow | null>(null);
+
+  const load = async () => {
+    const [{ data: tk }, { data: mem }] = await Promise.all([
+      supabase.from("group_tasks").select("*").eq("group_id", groupId).eq("deleted", false),
+      supabase.from("group_members").select("*").eq("group_id", groupId),
+    ]);
+    setTasks((tk ?? []) as TaskRow[]);
+    setMembers((mem ?? []) as MemberRow[]);
+  };
+
+  useEffect(() => {
+    load();
+    const ch = supabase
+      .channel(`indiv:${groupId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "group_tasks", filter: `group_id=eq.${groupId}` },
+        load,
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId]);
+
+  const cycle = async (t: TaskRow) => {
+    const next: TaskRow["status"] =
+      t.status === "todo" ? "inprogress" : t.status === "inprogress" ? "done" : "todo";
+    setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: next } : x)));
+    await supabase.from("group_tasks").update({ status: next }).eq("id", t.id);
+  };
+
+  const del = async (t: TaskRow) => {
+    if (!confirm(`Delete "${t.title}"?`)) return;
+    await supabase.from("group_tasks").update({ deleted: true }).eq("id", t.id);
+    load();
+  };
+
+  const groups: { key: TaskRow["status"]; label: string; color: string }[] = [
+    { key: "todo", label: "To Do", color: "#6B7280" },
+    { key: "inprogress", label: "In Progress", color: "#F59E0B" },
+    { key: "done", label: "Done", color: "#10B981" },
+  ];
+
+  const totalPts = tasks
+    .filter((t) => t.status === "done")
+    .reduce((s, t) => s + t.pts, 0);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between rounded-lg border border-border bg-card p-3 text-sm">
+        <span className="text-muted-foreground">
+          {tasks.length} task{tasks.length === 1 ? "" : "s"} ·{" "}
+          {tasks.filter((t) => t.status === "done").length} done
+        </span>
+        <span className="font-semibold">{totalPts} pts</span>
+      </div>
+      {groups.map((g) => {
+        const list = tasks.filter((t) => t.status === g.key);
+        if (list.length === 0) return null;
+        return (
+          <div key={g.key} className="rounded-lg border border-border bg-card">
+            <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-full"
+                style={{ background: g.color }}
+              />
+              <h3 className="text-sm font-semibold">{g.label}</h3>
+              <span className="ml-auto text-xs text-muted-foreground">{list.length}</span>
+            </div>
+            <ul>
+              {list.map((t) => {
+                const assignee = members.find((m) => m.user_id === t.assigned_to);
+                const priColor =
+                  t.priority === "high"
+                    ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                    : t.priority === "medium"
+                      ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                      : "bg-gray-500/15 text-gray-600 dark:text-gray-400";
+                const ptsColor =
+                  t.status === "done"
+                    ? "bg-green-500/15 text-green-700 dark:text-green-400"
+                    : "bg-secondary text-secondary-foreground";
+                return (
+                  <li
+                    key={t.id}
+                    className="flex items-center gap-3 border-b border-border p-3 last:border-b-0"
+                  >
+                    <button
+                      onClick={() => cycle(t)}
+                      className={`h-5 w-5 shrink-0 rounded-full border-2 ${
+                        t.status === "done"
+                          ? "border-green-500 bg-green-500"
+                          : t.status === "inprogress"
+                            ? "border-amber-500 bg-amber-500/30"
+                            : "border-border"
+                      }`}
+                      title="Click to cycle status"
+                    />
+                    <div className="flex-1">
+                      <div
+                        className={`text-sm font-medium ${
+                          t.status === "done" ? "text-muted-foreground line-through" : ""
+                        }`}
+                      >
+                        {t.title}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${priColor}`}
+                        >
+                          {t.priority}
+                        </span>
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${ptsColor}`}
+                        >
+                          {t.pts} pts
+                        </span>
+                        {t.due_date && (
+                          <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px]">
+                            {t.due_date}
+                          </span>
+                        )}
+                        {assignee && (
+                          <span className="ml-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                            <Avatar m={assignee} size={16} />
+                            {assignee.display_name?.split(" ")[0]}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setEditing(t)}
+                      className="rounded p-1 text-muted-foreground hover:bg-muted"
+                      title="Edit"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => del(t)}
+                      className="rounded p-1 text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
+                      title="Delete"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
+      {tasks.length === 0 && (
+        <div className="rounded-lg border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+          No tasks yet. Click "Add Task" above to create one.
+        </div>
+      )}
+      {editing && (
+        <TaskModal user={user} task={editing} members={members} onClose={() => setEditing(null)} />
+      )}
     </div>
   );
 }

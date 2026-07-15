@@ -5,6 +5,8 @@ import { AuthGate } from "@/components/AuthGate";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { AppShell, type AppView } from "@/components/AppShell";
 import { GroupsView } from "@/components/groups/GroupsView";
+import { NotificationsView } from "@/components/NotificationsView";
+import { MentorView } from "@/components/MentorView";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -570,6 +572,7 @@ function TrackerApp({ user, signOut }: TrackerProps) {
   });
 
   const [view, setView] = useState<AppView>("personal");
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -944,9 +947,23 @@ function TrackerApp({ user, signOut }: TrackerProps) {
               : "Up to date";
 
   return (
-    <AppShell view={view} setView={setView} user={user}>
+    <AppShell
+      view={view}
+      setView={setView}
+      user={user}
+      selectedGroupId={selectedGroupId}
+      setSelectedGroupId={setSelectedGroupId}
+    >
       {view === "groups" ? (
-        <GroupsView user={user} />
+        <GroupsView
+          user={user}
+          selectedGroupId={selectedGroupId}
+          setSelectedGroupId={setSelectedGroupId}
+        />
+      ) : view === "notifications" ? (
+        <NotificationsView user={user} />
+      ) : view === "mentors" ? (
+        <MentorView user={user} />
       ) : (
         <>
           {!online && (
