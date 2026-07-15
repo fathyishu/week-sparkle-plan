@@ -43,7 +43,7 @@ export function NotificationsView({ user }: { user: User }) {
         .eq("status", "pending")
         .ilike("mentee_email", email),
     ]);
-    const invList = ((inv ?? []) as GroupInvite[]) ?? [];
+    const invList = (inv ?? []) as GroupInvite[];
     if (invList.length) {
       const gIds = [...new Set(invList.map((i) => i.group_id))];
       const { data: gs } = await supabase.from("groups").select("id,name").in("id", gIds);
@@ -52,7 +52,7 @@ export function NotificationsView({ user }: { user: User }) {
       for (const i of invList) i.groupName = map[i.group_id] ?? "a group";
     }
     setInvites(invList);
-    setMentorReqs(((mr ?? []) as MentorReq[]) ?? []);
+    setMentorReqs((mr ?? []) as MentorReq[]);
   };
 
   useEffect(() => {
