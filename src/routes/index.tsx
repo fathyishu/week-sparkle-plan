@@ -570,6 +570,7 @@ function TrackerApp({ user, signOut }: TrackerProps) {
   });
 
   const [view, setView] = useState<AppView>("personal");
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hydrated) return;
