@@ -39,7 +39,7 @@ export function MentorView({ user }: { user: User }) {
 
   const load = async () => {
     const { data } = await supabase.from("mentorships").select("*");
-    const list = ((data ?? []) as Mentorship[]) ?? [];
+    const list = (data ?? []) as Mentorship[];
     setAsMentor(list.filter((m) => m.mentor_id === user.id));
     setAsMentee(list.filter((m) => m.mentee_id === user.id));
   };
