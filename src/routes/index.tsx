@@ -956,53 +956,43 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
               ? "Loading"
               : "Up to date";
 
-  return (
-    <AppShell
-      view={view}
-      setView={setView}
-      user={user}
-      selectedGroupId={selectedGroupId}
-      setSelectedGroupId={setSelectedGroupId}
-    >
-      {view === "groups" ? (
-        <GroupsView
-          user={user}
-          selectedGroupId={selectedGroupId}
-          setSelectedGroupId={setSelectedGroupId}
-        />
-      ) : view === "notifications" ? (
-        <NotificationsView user={user} />
-      ) : view === "mentors" ? (
-        <MentorView user={user} />
-      ) : (
-        <>
-          {!online && (
-            <div className="w-full bg-amber-500 px-4 py-1.5 text-center text-xs font-medium text-white">
-              Offline — changes will sync when reconnected
-            </div>
-          )}
-          {state.ui?.isDemo && !state.ui?.demoBannerDismissed && (
-            <div className="mx-auto max-w-5xl px-4 pt-4">
-              <div className="flex items-start gap-3 rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm">
-                <span className="text-lg">👋</span>
-                <p className="flex-1">
-                  Welcome! These are sample tasks to get you started. Add your own
-                  tasks or delete these anytime.
-                </p>
-                <button
-                  onClick={() =>
-                    setState((s) => ({
-                      ...s,
-                      ui: { ...(s.ui ?? {}), demoBannerDismissed: true },
-                    }))
-                  }
-                  className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-muted"
-                >
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          )}
+  const headerName = mentorMode ? mentorMode.targetName : displayName;
+  const headerAvatar = mentorMode ? mentorMode.targetAvatar ?? undefined : avatarUrl;
+
+  const personalContent = (
+    <>
+      {!online && (
+        <div className="w-full bg-amber-500 px-4 py-1.5 text-center text-xs font-medium text-white">
+          Offline — changes will sync when reconnected
+        </div>
+      )}
+      {mentorMode && (
+        <div className="w-full bg-primary/10 px-4 py-1.5 text-center text-xs font-medium text-primary">
+          Mentor mode — you are editing {mentorMode.targetName}'s personal tasks
+        </div>
+      )}
+      {state.ui?.isDemo && !state.ui?.demoBannerDismissed && (
+        <div className="mx-auto max-w-5xl px-4 pt-4">
+          <div className="flex items-start gap-3 rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm">
+            <span className="text-lg">👋</span>
+            <p className="flex-1">
+              Welcome! These are sample tasks to get you started. Add your own
+              tasks or delete these anytime.
+            </p>
+            <button
+              onClick={() =>
+                setState((s) => ({
+                  ...s,
+                  ui: { ...(s.ui ?? {}), demoBannerDismissed: true },
+                }))
+              }
+              className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-muted"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
       <div className="mx-auto max-w-5xl px-4 py-6 sm:py-10">
         <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -1025,25 +1015,34 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
             </div>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1 shadow-sm">
-            {avatarUrl ? (
+            {headerAvatar ? (
               <img
-                src={avatarUrl}
-                alt={displayName}
+                src={headerAvatar}
+                alt={headerName}
                 className="h-8 w-8 rounded-full"
                 referrerPolicy="no-referrer"
               />
             ) : (
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-xs font-semibold">
-                {displayName.slice(0, 1).toUpperCase()}
+                {headerName.slice(0, 1).toUpperCase()}
               </div>
             )}
-            <span className="max-w-[140px] truncate text-xs font-medium">{displayName}</span>
-            <button
-              onClick={signOut}
-              className="rounded-full border border-input bg-background px-3 py-1 text-xs font-medium transition hover:bg-accent"
-            >
-              Sign out
-            </button>
+            <span className="max-w-[140px] truncate text-xs font-medium">{headerName}</span>
+            {mentorMode ? (
+              <button
+                onClick={mentorMode.onBack}
+                className="rounded-full border border-input bg-background px-3 py-1 text-xs font-medium transition hover:bg-accent"
+              >
+                ← Back
+              </button>
+            ) : (
+              <button
+                onClick={signOut}
+                className="rounded-full border border-input bg-background px-3 py-1 text-xs font-medium transition hover:bg-accent"
+              >
+                Sign out
+              </button>
+            )}
           </div>
         </header>
 
@@ -1052,19 +1051,13 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
           <StatBox
             label="Tasks Complete"
             value={`${globalStats.done} / ${globalStats.total}`}
-            pct={
-              globalStats.total ? (globalStats.done / globalStats.total) * 100 : 0
-            }
+            pct={globalStats.total ? (globalStats.done / globalStats.total) * 100 : 0}
             barColor="var(--stat-green)"
           />
           <StatBox
             label="Points Earned"
             value={`${globalStats.pts} / ${globalStats.totalPts} pts`}
-            pct={
-              globalStats.totalPts
-                ? (globalStats.pts / globalStats.totalPts) * 100
-                : 0
-            }
+            pct={globalStats.totalPts ? (globalStats.pts / globalStats.totalPts) * 100 : 0}
             barColor="var(--stat-purple)"
           />
         </div>
@@ -1179,7 +1172,33 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
           </div>
         </div>
       </div>
-        </>
+    </>
+  );
+
+  if (mentorMode) {
+    return <div className="min-h-screen bg-background">{personalContent}</div>;
+  }
+
+  return (
+    <AppShell
+      view={view}
+      setView={setView}
+      user={user}
+      selectedGroupId={selectedGroupId}
+      setSelectedGroupId={setSelectedGroupId}
+    >
+      {view === "groups" ? (
+        <GroupsView
+          user={user}
+          selectedGroupId={selectedGroupId}
+          setSelectedGroupId={setSelectedGroupId}
+        />
+      ) : view === "notifications" ? (
+        <NotificationsView user={user} />
+      ) : view === "mentors" ? (
+        <MentorView user={user} signOut={signOut} />
+      ) : (
+        personalContent
       )}
     </AppShell>
   );
