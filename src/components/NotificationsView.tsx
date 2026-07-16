@@ -209,13 +209,12 @@ export function NotificationsView({ user }: { user: User }) {
               <GraduationCap className="h-3.5 w-3.5" /> Mentor request
             </div>
             <p className="text-sm font-medium">
-              <b>{m.mentor_name ?? "Someone"}</b> wants to mentor you and view your
-              individual task progress.
+              <b>{m.mentor_name ?? "Someone"}</b> wants to be your mentor.
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Accepting gives them read-only visibility into your personal tasks and
-              progress. They cannot see any group tasks. You can revoke access at
-              any time.
+              If you accept, they will have <b>full access</b> to view, add, edit,
+              and delete your individual tasks. They cannot see any group tasks.
+              You can revoke access at any time.
             </p>
             <div className="mt-3 flex gap-2">
               <button
