@@ -541,9 +541,16 @@ const STORAGE_KEY = "weekly-tracker-v2";
 interface TrackerProps {
   user: User;
   signOut: () => Promise<void>;
+  mentorMode?: {
+    targetUserId: string;
+    targetName: string;
+    targetAvatar?: string | null;
+    onBack: () => void;
+  };
 }
 
-function TrackerApp({ user, signOut }: TrackerProps) {
+export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
+  const syncUserId = mentorMode?.targetUserId ?? user.id;
   const [state, setState] = useState<AppState>(initialState);
   const [hydrated, setHydrated] = useState(false);
   const [cloudReady, setCloudReady] = useState(false);
@@ -552,17 +559,20 @@ function TrackerApp({ user, signOut }: TrackerProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    setHydrated(false);
+    setCloudReady(false);
     try {
-      const raw = localStorage.getItem(`${STORAGE_KEY}:${user.id}`);
+      const raw = localStorage.getItem(`${STORAGE_KEY}:${syncUserId}`);
       if (raw) setState(JSON.parse(raw));
+      else setState(initialState());
     } catch {
       /* ignore */
     }
     setHydrated(true);
-  }, [user.id]);
+  }, [syncUserId]);
 
   const { status: syncStatus, online, remotePulse } = useCloudSync<AppState>({
-    userId: user.id,
+    userId: syncUserId,
     state,
     setState,
     hydrated,
@@ -577,11 +587,11 @@ function TrackerApp({ user, signOut }: TrackerProps) {
   useEffect(() => {
     if (!hydrated) return;
     try {
-      localStorage.setItem(`${STORAGE_KEY}:${user.id}`, JSON.stringify(state));
+      localStorage.setItem(`${STORAGE_KEY}:${syncUserId}`, JSON.stringify(state));
     } catch {
       /* ignore */
     }
-  }, [state, hydrated, user.id]);
+  }, [state, hydrated, syncUserId]);
 
   useEffect(() => {
     setSelected(new Set());
