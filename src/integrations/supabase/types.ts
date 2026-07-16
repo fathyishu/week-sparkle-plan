@@ -624,6 +624,10 @@ export type Database = {
         Args: { _group: string; _user: string }
         Returns: boolean
       }
+      is_mentor_of: {
+        Args: { _mentee: string; _mentor: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
