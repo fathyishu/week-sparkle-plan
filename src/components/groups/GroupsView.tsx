@@ -409,6 +409,37 @@ function GroupDetail({
   const [taskMode, setTaskMode] = useState<"individual" | "board">("individual");
   const [showInvite, setShowInvite] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
+
+  const deleteGroup = async () => {
+    if (
+      !confirm(
+        `Delete ${groupName}? This will permanently remove the group, all its tasks, and remove access for all members. This cannot be undone.`,
+      )
+    )
+      return;
+    const { error } = await supabase.from("groups").delete().eq("id", groupId);
+    if (error) {
+      alert(`Failed to delete: ${error.message}`);
+      return;
+    }
+    onBack();
+  };
+
+  const leaveGroup = async () => {
+    if (!confirm(`Leave ${groupName}? You will lose access to this group's tasks.`))
+      return;
+    const { error } = await supabase
+      .from("group_members")
+      .delete()
+      .eq("group_id", groupId)
+      .eq("user_id", user.id);
+    if (error) {
+      alert(`Failed to leave: ${error.message}`);
+      return;
+    }
+    onBack();
+  };
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -450,6 +481,21 @@ function GroupDetail({
             >
               <UserPlus className="h-3.5 w-3.5" /> Add People
             </button>
+            {isOwner ? (
+              <button
+                onClick={deleteGroup}
+                className="inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-500/20 dark:text-red-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Delete Group
+              </button>
+            ) : (
+              <button
+                onClick={leaveGroup}
+                className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted"
+              >
+                Leave Group
+              </button>
+            )}
           </div>
         )}
       </div>
