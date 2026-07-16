@@ -481,6 +481,21 @@ function GroupDetail({
             >
               <UserPlus className="h-3.5 w-3.5" /> Add People
             </button>
+            {isOwner ? (
+              <button
+                onClick={deleteGroup}
+                className="inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-500/20 dark:text-red-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Delete Group
+              </button>
+            ) : (
+              <button
+                onClick={leaveGroup}
+                className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted"
+              >
+                Leave Group
+              </button>
+            )}
           </div>
         )}
       </div>
