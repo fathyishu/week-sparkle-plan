@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { Bell, Users as UsersIcon, GraduationCap, Check, X } from "lucide-react";
+import { Bell, Users as UsersIcon, GraduationCap, Check, X, UserPlus } from "lucide-react";
 
 type GroupInvite = {
   id: string;
@@ -23,25 +23,33 @@ type MentorReq = {
   mentor_name: string | null;
 };
 
+type FriendReq = {
+  id: string;
+  user_id_a: string;
+  user_id_b: string;
+  status: string;
+  requested_by: string;
+  created_at: string;
+  actor_name: string | null;
+};
+
 export function NotificationsView({ user }: { user: User }) {
   const [invites, setInvites] = useState<GroupInvite[]>([]);
   const [mentorReqs, setMentorReqs] = useState<MentorReq[]>([]);
+  const [friendReqs, setFriendReqs] = useState<FriendReq[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const email = (user.email ?? "").toLowerCase();
 
   const load = async () => {
     if (!email) return;
-    const [{ data: inv }, { data: mr }] = await Promise.all([
+    const [{ data: inv }, { data: mr }, { data: fr }] = await Promise.all([
       supabase
         .from("group_invitations")
         .select("*")
         .eq("status", "pending")
         .ilike("invited_email", email),
-      supabase
-        .from("mentorships")
-        .select("*")
-        .eq("status", "pending")
-        .ilike("mentee_email", email),
+      supabase.from("mentorships").select("*").eq("status", "pending").ilike("mentee_email", email),
+      supabase.from("friendships").select("*").eq("status", "pending").eq("user_id_b", user.id),
     ]);
     const invList = (inv ?? []) as GroupInvite[];
     if (invList.length) {
@@ -53,22 +61,16 @@ export function NotificationsView({ user }: { user: User }) {
     }
     setInvites(invList);
     setMentorReqs((mr ?? []) as MentorReq[]);
+    setFriendReqs((fr ?? []) as FriendReq[]);
   };
 
   useEffect(() => {
     load();
     const ch = supabase
       .channel(`notif:${user.id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "group_invitations" },
-        load,
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "mentorships" },
-        load,
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "group_invitations" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "mentorships" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "friendships" }, load)
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
@@ -117,10 +119,7 @@ export function NotificationsView({ user }: { user: User }) {
       .update({
         status: "accepted",
         mentee_id: user.id,
-        mentee_name:
-          (user.user_metadata?.full_name as string | undefined) ??
-          user.email ??
-          null,
+        mentee_name: (user.user_metadata?.full_name as string | undefined) ?? user.email ?? null,
         mentee_avatar:
           (user.user_metadata?.avatar_url as string | undefined) ??
           (user.user_metadata?.picture as string | undefined) ??
@@ -140,7 +139,18 @@ export function NotificationsView({ user }: { user: User }) {
     load();
   };
 
-  const total = invites.length + mentorReqs.length;
+  const acceptFriend = async (f: FriendReq) => {
+    await supabase.from("friendships").update({ status: "accepted" }).eq("id", f.id);
+    showToast("Friend added!");
+    load();
+  };
+
+  const declineFriend = async (f: FriendReq) => {
+    await supabase.from("friendships").update({ status: "declined" }).eq("id", f.id);
+    load();
+  };
+
+  const total = invites.length + mentorReqs.length + friendReqs.length;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 sm:py-10">
@@ -154,9 +164,7 @@ export function NotificationsView({ user }: { user: User }) {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
           <p className="text-sm text-muted-foreground">
-            {total > 0
-              ? `${total} pending item${total === 1 ? "" : "s"}`
-              : "You're all caught up."}
+            {total > 0 ? `${total} pending item${total === 1 ? "" : "s"}` : "You're all caught up."}
           </p>
         </div>
       </header>
@@ -169,10 +177,7 @@ export function NotificationsView({ user }: { user: User }) {
 
       <div className="space-y-3">
         {invites.map((inv) => (
-          <div
-            key={inv.id}
-            className="rounded-lg border border-border bg-card p-4 shadow-sm"
-          >
+          <div key={inv.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
             <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-primary">
               <UsersIcon className="h-3.5 w-3.5" /> Group invite
             </div>
@@ -180,8 +185,7 @@ export function NotificationsView({ user }: { user: User }) {
               You've been invited to join <b>{inv.groupName}</b>.
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Once accepted, you will be added to the group. You can collaborate on
-              tasks.
+              Once accepted, you will be added to the group. You can collaborate on tasks.
             </p>
             <div className="mt-3 flex gap-2">
               <button
@@ -201,10 +205,7 @@ export function NotificationsView({ user }: { user: User }) {
         ))}
 
         {mentorReqs.map((m) => (
-          <div
-            key={m.id}
-            className="rounded-lg border border-border bg-card p-4 shadow-sm"
-          >
+          <div key={m.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
             <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-primary">
               <GraduationCap className="h-3.5 w-3.5" /> Mentor request
             </div>
@@ -212,9 +213,8 @@ export function NotificationsView({ user }: { user: User }) {
               <b>{m.mentor_name ?? "Someone"}</b> wants to be your mentor.
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              If you accept, they will have <b>full access</b> to view, add, edit,
-              and delete your individual tasks. They cannot see any group tasks.
-              You can revoke access at any time.
+              If you accept, they will have <b>full access</b> to view, add, edit, and delete your
+              individual tasks. They cannot see any group tasks. You can revoke access at any time.
             </p>
             <div className="mt-3 flex gap-2">
               <button
@@ -225,6 +225,34 @@ export function NotificationsView({ user }: { user: User }) {
               </button>
               <button
                 onClick={() => declineMentor(m)}
+                className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+              >
+                <X className="h-3.5 w-3.5" /> Decline
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {friendReqs.map((f) => (
+          <div key={f.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-primary">
+              <UserPlus className="h-3.5 w-3.5" /> Friend request
+            </div>
+            <p className="text-sm font-medium">
+              <b>{f.actor_name ?? "Someone"}</b> wants to be your friend.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              If you accept, you'll appear on each other's personal leaderboard.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => acceptFriend(f)}
+                className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+              >
+                <Check className="h-3.5 w-3.5" /> Accept
+              </button>
+              <button
+                onClick={() => declineFriend(f)}
                 className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
               >
                 <X className="h-3.5 w-3.5" /> Decline
