@@ -30,7 +30,8 @@ type FriendReq = {
   status: string;
   requested_by: string;
   created_at: string;
-  actor_name: string | null;
+  updated_at: string;
+  actor_name?: string | null;
 };
 
 export function NotificationsView({ user }: { user: User }) {

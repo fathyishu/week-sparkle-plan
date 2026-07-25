@@ -122,6 +122,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      friendships: {
+        Row: {
+          id: string;
+          user_id_a: string;
+          user_id_b: string;
+          status: string;
+          requested_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id_a: string;
+          user_id_b: string;
+          status?: string;
+          requested_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id_a?: string;
+          user_id_b?: string;
+          status?: string;
+          requested_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       group_invitations: {
         Row: {
           created_at: string;
@@ -614,6 +644,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      admin_read_user_state: {
+        Args: { _target: string };
+        Returns: Json;
+      };
       is_group_member: {
         Args: { _group: string; _user: string };
         Returns: boolean;

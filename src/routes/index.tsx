@@ -1195,6 +1195,7 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
         return {
           date: iso.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
           isoDate: iso.toISOString(),
+          sections: prev?.sections ?? [],
           tasks,
           notes,
         };
@@ -1252,6 +1253,7 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
         return {
           date: iso.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
           isoDate: iso.toISOString(),
+          sections: prev?.sections ?? [],
           tasks: i === 0 ? [...targets, ...tasks] : tasks,
           notes,
         };
