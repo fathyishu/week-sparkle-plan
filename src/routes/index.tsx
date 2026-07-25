@@ -1116,7 +1116,7 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
-            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           },
           body: JSON.stringify({ action: "check" }),
         });

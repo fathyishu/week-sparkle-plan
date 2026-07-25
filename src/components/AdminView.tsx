@@ -38,7 +38,7 @@ export function AdminView({ user }: { user: User }) {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ""}`,
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
         body: JSON.stringify({ action: "verify", pin }),
       });
@@ -69,7 +69,7 @@ export function AdminView({ user }: { user: User }) {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ""}`,
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
         body: JSON.stringify({ action: "forgot" }),
       });
