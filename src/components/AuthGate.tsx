@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 
 interface AuthGateProps {
   children: (ctx: { user: User; signOut: () => Promise<void> }) => ReactNode;
@@ -28,11 +27,12 @@ export function AuthGate({ children }: AuthGateProps) {
     setSigningIn(true);
     setError(null);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin },
       });
-      if (result.error) {
-        setError(result.error.message ?? "Sign in failed");
+      if (oauthError) {
+        setError(oauthError.message ?? "Sign in failed");
         setSigningIn(false);
       }
     } catch (e) {
