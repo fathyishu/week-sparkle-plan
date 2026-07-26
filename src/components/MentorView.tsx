@@ -16,7 +16,13 @@ type Mentorship = {
   mentee_avatar: string | null;
 };
 
-export function MentorView({ user, signOut }: { user: User; signOut: () => Promise<void> }) {
+export function MentorView({
+  user,
+  signOut,
+}: {
+  user: User;
+  signOut: () => Promise<void>;
+}) {
   const [asMentor, setAsMentor] = useState<Mentorship[]>([]);
   const [asMentee, setAsMentee] = useState<Mentorship[]>([]);
   const [selected, setSelected] = useState<Mentorship | null>(null);
@@ -34,7 +40,11 @@ export function MentorView({ user, signOut }: { user: User; signOut: () => Promi
     load();
     const ch = supabase
       .channel(`mentors:${user.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "mentorships" }, load)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "mentorships" },
+        load,
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
@@ -86,8 +96,8 @@ export function MentorView({ user, signOut }: { user: User; signOut: () => Promi
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Mentorship</h1>
             <p className="text-sm text-muted-foreground">
-              Mentors get full access to view, add, edit, and delete your personal tasks. Group
-              tasks are never shared.
+              Mentors get full access to view, add, edit, and delete your personal
+              tasks. Group tasks are never shared.
             </p>
           </div>
         </div>
@@ -131,8 +141,12 @@ export function MentorView({ user, signOut }: { user: User; signOut: () => Promi
                     </div>
                   )}
                   <div className="flex-1">
-                    <div className="text-sm font-medium">{m.mentee_name ?? m.mentee_email}</div>
-                    <div className="text-xs text-muted-foreground">{m.mentee_email}</div>
+                    <div className="text-sm font-medium">
+                      {m.mentee_name ?? m.mentee_email}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {m.mentee_email}
+                    </div>
                   </div>
                 </button>
                 <button
@@ -161,7 +175,9 @@ export function MentorView({ user, signOut }: { user: User; signOut: () => Promi
               >
                 <div>
                   <div className="font-medium">{m.mentee_email}</div>
-                  <div className="text-xs text-muted-foreground">Awaiting acceptance</div>
+                  <div className="text-xs text-muted-foreground">
+                    Awaiting acceptance
+                  </div>
                 </div>
                 <button
                   onClick={() => revoke(m, "mentor")}
@@ -198,7 +214,9 @@ export function MentorView({ user, signOut }: { user: User; signOut: () => Promi
                   </div>
                 )}
                 <div className="flex-1">
-                  <div className="text-sm font-medium">{m.mentor_name ?? "Mentor"}</div>
+                  <div className="text-sm font-medium">
+                    {m.mentor_name ?? "Mentor"}
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     Full access to your personal tasks
                   </div>
@@ -216,7 +234,9 @@ export function MentorView({ user, signOut }: { user: User; signOut: () => Promi
         </section>
       )}
 
-      {showAdd && <AddMenteeModal user={user} onClose={() => setShowAdd(false)} onDone={load} />}
+      {showAdd && (
+        <AddMenteeModal user={user} onClose={() => setShowAdd(false)} onDone={load} />
+      )}
     </div>
   );
 }
@@ -264,8 +284,9 @@ function AddMenteeModal({
       <div className="w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-xl">
         <h2 className="mb-3 text-lg font-semibold">Add Mentee</h2>
         <p className="mb-3 text-xs text-muted-foreground">
-          Enter your mentee's email. They'll receive a notification. Once they accept, you'll have
-          full access to view, add, edit, and delete their personal tasks.
+          Enter your mentee's email. They'll receive a notification. Once they
+          accept, you'll have full access to view, add, edit, and delete their
+          personal tasks.
         </p>
         <input
           autoFocus
@@ -277,7 +298,10 @@ function AddMenteeModal({
         />
         {err && <p className="mb-2 text-xs text-red-500">{err}</p>}
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-md border border-border px-3 py-1.5 text-sm">
+          <button
+            onClick={onClose}
+            className="rounded-md border border-border px-3 py-1.5 text-sm"
+          >
             Cancel
           </button>
           <button

@@ -23,7 +23,9 @@ export function useCloudSync<T>({
   buildFirstTime,
 }: UseCloudSyncArgs<T>) {
   const [status, setStatus] = useState<SyncStatus>("loading");
-  const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [online, setOnline] = useState(
+    typeof navigator !== "undefined" ? navigator.onLine : true,
+  );
   const [remotePulse, setRemotePulse] = useState(0);
   const lastRemoteHash = useRef<string>("");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
