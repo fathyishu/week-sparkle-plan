@@ -1,20 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  DndContext,
-  useDraggable,
-  useDroppable,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  ArrowLeft,
-  Plus,
-  UserPlus,
-  Trash2,
-  Pencil,
-  Users as UsersIcon,
-} from "lucide-react";
+import { DndContext, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core";
+import { ArrowLeft, Plus, UserPlus, Trash2, Pencil, Users as UsersIcon } from "lucide-react";
 
 type GroupRow = {
   id: string;
@@ -102,10 +90,7 @@ export function GroupsView({
     setGroups((gs ?? []) as GroupRow[]);
     if (gs && gs.length) {
       const ids = gs.map((g) => g.id);
-      const { data: mem } = await supabase
-        .from("group_members")
-        .select("*")
-        .in("group_id", ids);
+      const { data: mem } = await supabase.from("group_members").select("*").in("group_id", ids);
       const byG: Record<string, MemberRow[]> = {};
       const mCount: Record<string, number> = {};
       for (const m of (mem ?? []) as MemberRow[]) {
@@ -297,7 +282,13 @@ export function GroupsView({
 }
 
 /* ================================================================== */
-function Avatar({ m, size = 24 }: { m: Pick<MemberRow, "display_name" | "avatar_url">; size?: number }) {
+function Avatar({
+  m,
+  size = 24,
+}: {
+  m: Pick<MemberRow, "display_name" | "avatar_url">;
+  size?: number;
+}) {
   const initials = (m.display_name ?? "?")
     .split(" ")
     .map((s) => s[0])
@@ -372,10 +363,7 @@ function CreateGroupModal({
           />
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <button
-            onClick={onClose}
-            className="rounded-md border border-border px-3 py-1.5 text-sm"
-          >
+          <button onClick={onClose} className="rounded-md border border-border px-3 py-1.5 text-sm">
             Cancel
           </button>
           <button
@@ -426,8 +414,7 @@ function GroupDetail({
   };
 
   const leaveGroup = async () => {
-    if (!confirm(`Leave ${groupName}? You will lose access to this group's tasks.`))
-      return;
+    if (!confirm(`Leave ${groupName}? You will lose access to this group's tasks.`)) return;
     const { error } = await supabase
       .from("group_members")
       .delete()
@@ -514,9 +501,7 @@ function GroupDetail({
           </button>
         ))}
       </div>
-      {tab === "tasks" && taskMode === "board" && (
-        <GroupBoard user={user} groupId={groupId} />
-      )}
+      {tab === "tasks" && taskMode === "board" && <GroupBoard user={user} groupId={groupId} />}
       {tab === "tasks" && taskMode === "individual" && (
         <GroupIndividual user={user} groupId={groupId} />
       )}
@@ -525,18 +510,10 @@ function GroupDetail({
       {tab === "leaderboard" && <GroupLeaderboard groupId={groupId} />}
 
       {showInvite && (
-        <InviteModal
-          user={user}
-          groupId={groupId}
-          onClose={() => setShowInvite(false)}
-        />
+        <InviteModal user={user} groupId={groupId} onClose={() => setShowInvite(false)} />
       )}
       {showAddTask && (
-        <QuickAddTaskModal
-          user={user}
-          groupId={groupId}
-          onClose={() => setShowAddTask(false)}
-        />
+        <QuickAddTaskModal user={user} groupId={groupId} onClose={() => setShowAddTask(false)} />
       )}
     </div>
   );
@@ -570,7 +547,8 @@ function GroupBoard({ user, groupId }: { user: User; groupId: string }) {
           const n = payload.new as TaskRow | undefined;
           const o = payload.old as TaskRow | undefined;
           if (n && o && n.status !== o.status && n.created_by !== user.id) {
-            const label = n.status === "inprogress" ? "In Progress" : n.status === "done" ? "Done" : "To Do";
+            const label =
+              n.status === "inprogress" ? "In Progress" : n.status === "done" ? "Done" : "To Do";
             setToast(`Task "${n.title}" moved to ${label}`);
             setTimeout(() => setToast(null), 3000);
           }
@@ -667,12 +645,7 @@ function GroupBoard({ user, groupId }: { user: User; groupId: string }) {
         ))}
       </div>
       {editing && (
-        <TaskModal
-          user={user}
-          task={editing}
-          members={members}
-          onClose={() => setEditing(null)}
-        />
+        <TaskModal user={user} task={editing} members={members} onClose={() => setEditing(null)} />
       )}
     </DndContext>
   );
@@ -822,9 +795,7 @@ function TaskCard({
           {task.pts} pts
         </span>
         {task.due_date && (
-          <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px]">
-            {task.due_date}
-          </span>
+          <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px]">{task.due_date}</span>
         )}
         <div className="ml-auto flex items-center gap-1">
           {assignee ? (
@@ -1079,11 +1050,7 @@ function GroupMembers({
         })}
       </div>
       {showInvite && (
-        <InviteModal
-          user={user}
-          groupId={groupId}
-          onClose={() => setShowInvite(false)}
-        />
+        <InviteModal user={user} groupId={groupId} onClose={() => setShowInvite(false)} />
       )}
     </div>
   );
@@ -1131,10 +1098,7 @@ function InviteModal({
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
         />
         <div className="flex justify-end gap-2 pt-2">
-          <button
-            onClick={onClose}
-            className="rounded-md border border-border px-3 py-1.5 text-sm"
-          >
+          <button onClick={onClose} className="rounded-md border border-border px-3 py-1.5 text-sm">
             Cancel
           </button>
           <button
@@ -1181,10 +1145,7 @@ function GroupSections({ groupId, isOwner }: { groupId: string; isOwner: boolean
         ) : (
           sections.map((s) => (
             <div key={s.id} className="flex items-center gap-2 py-1.5">
-              <span
-                className="inline-block h-3 w-3 rounded-full"
-                style={{ background: s.color }}
-              />
+              <span className="inline-block h-3 w-3 rounded-full" style={{ background: s.color }} />
               <span className="text-sm">{s.label}</span>
               {isOwner && (
                 <button
@@ -1264,10 +1225,12 @@ function GroupLeaderboard({ groupId }: { groupId: string }) {
             key={r.user_id}
             className="flex items-center gap-3 border-b border-border p-3 last:border-b-0"
           >
-            <span className="w-6 text-center text-sm font-bold text-muted-foreground">
-              {i + 1}
-            </span>
-            {r.member ? <Avatar m={r.member} size={32} /> : <div className="h-8 w-8 rounded-full bg-secondary" />}
+            <span className="w-6 text-center text-sm font-bold text-muted-foreground">{i + 1}</span>
+            {r.member ? (
+              <Avatar m={r.member} size={32} />
+            ) : (
+              <div className="h-8 w-8 rounded-full bg-secondary" />
+            )}
             <div className="flex-1 text-sm font-medium">
               {r.member?.display_name ?? r.user_id.slice(0, 8)}
             </div>
@@ -1443,9 +1406,7 @@ function GroupIndividual({ user, groupId }: { user: User; groupId: string }) {
     { key: "done", label: "Done", color: "#10B981" },
   ];
 
-  const totalPts = tasks
-    .filter((t) => t.status === "done")
-    .reduce((s, t) => s + t.pts, 0);
+  const totalPts = tasks.filter((t) => t.status === "done").reduce((s, t) => s + t.pts, 0);
 
   return (
     <div className="space-y-4">

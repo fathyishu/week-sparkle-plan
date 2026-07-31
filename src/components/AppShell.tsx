@@ -6,13 +6,15 @@ import {
   X,
   Bell,
   GraduationCap,
+  Trophy,
+  Shield,
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
-export type AppView = "personal" | "groups" | "notifications" | "mentors";
+export type AppView = "personal" | "groups" | "notifications" | "mentors" | "leaderboard" | "admin";
 
 interface Props {
   view: AppView;
@@ -20,6 +22,7 @@ interface Props {
   user: User;
   selectedGroupId: string | null;
   setSelectedGroupId: (id: string | null) => void;
+  isAdmin: boolean;
   children: React.ReactNode;
 }
 
@@ -31,6 +34,7 @@ export function AppShell({
   user,
   selectedGroupId,
   setSelectedGroupId,
+  isAdmin,
   children,
 }: Props) {
   const [inviteCount, setInviteCount] = useState(0);
@@ -68,26 +72,10 @@ export function AppShell({
     load();
     const channel = supabase
       .channel(`shell:${user.id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "groups" },
-        load,
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "group_invitations" },
-        load,
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "group_members" },
-        load,
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "mentorships" },
-        load,
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "groups" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "group_invitations" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "group_members" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "mentorships" }, load)
       .subscribe();
     return () => {
       cancel = true;
@@ -150,9 +138,7 @@ export function AppShell({
         {groupsExpanded && (
           <div className="ml-6 mt-1 flex flex-col gap-0.5">
             {groups.length === 0 ? (
-              <div className="px-2 py-1 text-[11px] text-muted-foreground">
-                No groups yet
-              </div>
+              <div className="px-2 py-1 text-[11px] text-muted-foreground">No groups yet</div>
             ) : (
               groups.map((g) => (
                 <button
@@ -190,6 +176,17 @@ export function AppShell({
 
       <button
         onClick={() => {
+          setView("leaderboard");
+          setMobileOpen(false);
+        }}
+        className={itemClass(view === "leaderboard")}
+      >
+        <Trophy className="h-4 w-4" />
+        <span>Leaderboard</span>
+      </button>
+
+      <button
+        onClick={() => {
           setView("mentors");
           setMobileOpen(false);
         }}
@@ -198,6 +195,19 @@ export function AppShell({
         <GraduationCap className="h-4 w-4" />
         <span>Mentorship</span>
       </button>
+
+      {isAdmin && (
+        <button
+          onClick={() => {
+            setView("admin");
+            setMobileOpen(false);
+          }}
+          className={itemClass(view === "admin")}
+        >
+          <Shield className="h-4 w-4" />
+          <span>Admin</span>
+        </button>
+      )}
     </nav>
   );
 
@@ -236,8 +246,6 @@ export function AppShell({
 
 function itemClass(active: boolean) {
   return `group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-    active
-      ? "bg-primary/10 text-primary"
-      : "text-foreground hover:bg-muted"
+    active ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted"
   }`;
 }
