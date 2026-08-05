@@ -36,62 +36,37 @@ function RouteRoot() {
 }
 
 /* =========================================================================
-   TYPES
+   TYPES — see src/lib/types.ts
    ========================================================================= */
-type TaskStatus = "pending" | "done" | "carry";
-type BadgeType = "OVERDUE" | "URGENT" | "MEETING" | "ONE-TIME";
+import type {
+  AppState,
+  BadgeType,
+  DayData,
+  HistoryDay,
+  Note,
+  Section,
+  StreakInfo,
+  Task,
+  TaskDef,
+  TaskStatus,
+  WeekHistory,
+} from "@/lib/types";
+import {
+  bumpStreak,
+  defsToCsv,
+  dropStreak,
+  fmtDate,
+  materializeWeek,
+  migrateState,
+  parseDefsCsv,
+  resetWeekToPending,
+  sectionCatalog,
+  shiftDays,
+  snapshotDays,
+  uid,
+  weekdayOf,
+} from "@/lib/tracker";
 
-interface Task {
-  id: string;
-  title: string;
-  points: number;
-  status: TaskStatus;
-  sectionId: string;
-  badges?: BadgeType[];
-  carriedFromDay?: number; // 1-indexed
-  custom?: boolean;
-}
-
-interface Section {
-  id: string;
-  label: string;
-  color: string; // hex
-}
-
-interface Note {
-  id: string;
-  text: string;
-  status: TaskStatus;
-  carriedFromDay?: number;
-}
-
-interface DayData {
-  date: string; // dd/M
-  isoDate: string;
-  sections: Section[]; // ordered
-  tasks: Task[];
-  notes: Note[];
-}
-
-interface WeekHistory {
-  week: number;
-  range: string;
-  taskPct: number;
-  ptsPct: number;
-  tasksDone: number;
-  tasksTotal: number;
-}
-
-interface AppState {
-  weekStartISO: string; // Monday
-  weekNumber: number;
-  days: DayData[];
-  history: WeekHistory[];
-  ui?: {
-    isDemo?: boolean;
-    demoBannerDismissed?: boolean;
-  };
-}
 
 /* =========================================================================
    BASE DATA — sections and seed tasks
@@ -356,11 +331,8 @@ const ONE_TIME_BY_DAY: Record<number, Seed[]> = {
    HELPERS
    ========================================================================= */
 
-const uid = () => Math.random().toString(36).slice(2, 11);
-
 const MONDAY_JUNE_16 = new Date(2026, 6, 10); // Day 1 = Friday July 10, 2026
 
-const fmtDate = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}`;
 
 function buildWeek(mondayISO: string, weekNumber: number): DayData[] {
   const monday = new Date(mondayISO);
@@ -441,13 +413,16 @@ function buildWeek(mondayISO: string, weekNumber: number): DayData[] {
 }
 
 function initialState(): AppState {
-  return {
+  return migrateState({
     weekStartISO: MONDAY_JUNE_16.toISOString(),
     weekNumber: 1,
     days: buildWeek(MONDAY_JUNE_16.toISOString(), 1),
     history: [],
-  };
+    taskDefs: [],
+    streaks: {},
+  });
 }
+
 
 /* Demo starter template shown to first-time users */
 const DEMO_SECTIONS: Section[] = [
@@ -523,14 +498,17 @@ function buildDemoWeek(mondayISO: string): DayData[] {
 }
 
 function buildDemoState(): AppState {
-  return {
+  return migrateState({
     weekStartISO: MONDAY_JUNE_16.toISOString(),
     weekNumber: 1,
     days: buildDemoWeek(MONDAY_JUNE_16.toISOString()),
     history: [],
+    taskDefs: [],
+    streaks: {},
     ui: { isDemo: true, demoBannerDismissed: false },
-  };
+  });
 }
+
 
 const STORAGE_KEY = "weekly-tracker-v2";
 
@@ -557,19 +535,33 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
   const [activeDay, setActiveDay] = useState(1); // 1-indexed
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [historyOpen, setHistoryOpen] = useState<WeekHistory | null>(null);
 
   useEffect(() => {
     setHydrated(false);
     setCloudReady(false);
     try {
       const raw = localStorage.getItem(`${STORAGE_KEY}:${syncUserId}`);
-      if (raw) setState(JSON.parse(raw));
-      else setState(initialState());
+      if (raw) {
+        const parsed = migrateState(JSON.parse(raw) as AppState);
+        setState({ ...parsed, days: materializeWeek(parsed, parsed.days) });
+      } else setState(initialState());
     } catch {
       /* ignore */
     }
     setHydrated(true);
   }, [syncUserId]);
+
+  // Normalise anything arriving from the cloud that predates permanent tasks.
+  useEffect(() => {
+    if (!hydrated) return;
+    setState((s) => {
+      if (s.taskDefs && s.taskDefs.length) return s;
+      const m = migrateState(s);
+      return { ...m, days: materializeWeek(m, m.days) };
+    });
+  }, [hydrated, state]);
+
 
   const { status: syncStatus, online, remotePulse } = useCloudSync<AppState>({
     userId: syncUserId,
@@ -721,16 +713,39 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
         };
       }
 
-      return { ...s, days: newDays };
+      // Streak bookkeeping
+      let streaks = s.streaks ?? {};
+      if (t.isStreak && t.defId) {
+        if (nextStatus === "done") {
+          streaks = { ...streaks, [t.defId]: bumpStreak(streaks[t.defId], d.isoDate) };
+        } else if (prevStatus === "done") {
+          streaks = { ...streaks, [t.defId]: dropStreak(streaks[t.defId], d.isoDate) };
+        }
+      }
+
+      return { ...s, days: newDays, streaks };
     });
   };
 
+  /** Deleting a task removes its permanent definition too. */
   const deleteTask = (taskId: string) => {
-    updateDay(activeDay - 1, (d) => ({
-      ...d,
-      tasks: d.tasks.filter((t) => t.id !== taskId),
-    }));
+    setState((s) => {
+      const dIdx = activeDay - 1;
+      const target = s.days[dIdx].tasks.find((t) => t.id === taskId);
+      const defId = target?.defId;
+      return {
+        ...s,
+        taskDefs: defId ? s.taskDefs.filter((d) => d.id !== defId) : s.taskDefs,
+        days: s.days.map((d, i) => ({
+          ...d,
+          tasks: d.tasks.filter((t) =>
+            defId ? t.defId !== defId : !(i === dIdx && t.id === taskId),
+          ),
+        })),
+      };
+    });
   };
+
 
   const bulkMoveCarry = () => {
     setState((s) => {
@@ -778,13 +793,29 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
   };
 
   const bulkDelete = () => {
-    updateDay(activeDay - 1, (d) => ({
-      ...d,
-      tasks: d.tasks.filter((t) => !selected.has(t.id)),
-    }));
+    setState((s) => {
+      const dIdx = activeDay - 1;
+      const defIds = new Set(
+        s.days[dIdx].tasks
+          .filter((t) => selected.has(t.id) && t.defId)
+          .map((t) => t.defId as string),
+      );
+      return {
+        ...s,
+        taskDefs: s.taskDefs.filter((d) => !defIds.has(d.id)),
+        days: s.days.map((d, i) => ({
+          ...d,
+          tasks: d.tasks.filter((t) => {
+            if (t.defId && defIds.has(t.defId)) return false;
+            return !(i === dIdx && selected.has(t.id));
+          }),
+        })),
+      };
+    });
     setSelected(new Set());
     setSelectMode(false);
   };
+
 
   /* ---------- notes ---------- */
   const addNote = () => {
@@ -831,7 +862,7 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
     }));
   };
 
-  /* ---------- add task ---------- */
+  /* ---------- add task (creates a permanent TaskDef) ---------- */
   const addTask = (opts: {
     title: string;
     points: number;
@@ -839,45 +870,29 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
     sectionLabel?: string;
     sectionColor?: string;
     daily: boolean;
+    isStreak?: boolean;
   }) => {
     setState((s) => {
       const targetIdxs = opts.daily ? [0, 1, 2, 3, 4, 5, 6] : [activeDay - 1];
-      const newDays = s.days.map((d, i) => {
-        if (!targetIdxs.includes(i)) return d;
-        // ensure section exists on this day
-        let sections = d.sections;
-        if (!sections.some((sec) => sec.id === opts.sectionId)) {
-          sections = [
-            ...sections,
-            {
-              id: opts.sectionId,
-              label: opts.sectionLabel ?? opts.sectionId,
-              color: opts.sectionColor ?? "#6B7280",
-            },
-          ];
-        }
-        return {
-          ...d,
-          sections,
-          tasks: [
-            ...d.tasks,
-            {
-              id: uid(),
-              title: opts.title,
-              points: opts.points,
-              status: "pending" as TaskStatus,
-              sectionId: opts.sectionId,
-              custom: true,
-            } satisfies Task,
-
-          ],
-        };
-      });
-      return { ...s, days: newDays };
+      const newDefs: TaskDef[] = targetIdxs.map((i) => ({
+        id: uid(),
+        title: opts.title,
+        points: opts.points,
+        sectionId: opts.sectionId,
+        weekday: weekdayOf(s.days[i].isoDate),
+        isStreak: opts.isStreak,
+      }));
+      const section: Section = {
+        id: opts.sectionId,
+        label: opts.sectionLabel ?? opts.sectionId,
+        color: opts.sectionColor ?? "#6B7280",
+      };
+      const next: AppState = { ...s, taskDefs: [...s.taskDefs, ...newDefs] };
+      return { ...next, days: materializeWeek(next, s.days, [section]) };
     });
   };
 
-  /* ---------- week rollover ---------- */
+  /* ---------- week rollover (keeps every task, just unchecks) ---------- */
   const rollover = () => {
     setState((s) => {
       let totalDone = 0,
@@ -903,13 +918,16 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
         ptsPct: totalPtsAll ? Math.round((totalPts / totalPtsAll) * 100) : 0,
         tasksDone: totalDone,
         tasksTotal: totalTasks,
+        days: snapshotDays(s.days),
       };
       const nextMonday = new Date(s.weekStartISO);
       nextMonday.setDate(nextMonday.getDate() + 7);
+      const shifted = resetWeekToPending(shiftDays(s.days, 7));
       return {
+        ...s,
         weekStartISO: nextMonday.toISOString(),
         weekNumber: s.weekNumber + 1,
-        days: buildWeek(nextMonday.toISOString(), s.weekNumber + 1),
+        days: materializeWeek(s, shifted),
         history: [...s.history, snap],
       };
     });
@@ -917,11 +935,55 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
   };
 
   const resetAll = () => {
-    if (confirm("Reset entire tracker to Week 1? This clears all progress and history.")) {
-      setState(initialState());
+    if (confirm("Uncheck every task for this week? Your tasks and history are kept.")) {
+      setState((s) => ({ ...s, days: materializeWeek(s, resetWeekToPending(s.days)) }));
       setActiveDay(1);
     }
   };
+
+  /* ---------- CSV export / import of permanent tasks ---------- */
+  const exportCsv = () => {
+    const csv = defsToCsv(state.taskDefs, sectionCatalog(state.days));
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `weekly-tasks-week-${state.weekNumber}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importCsv = async (file: File) => {
+    const rows = parseDefsCsv(await file.text());
+    if (!rows.length) return;
+    setState((s) => {
+      const catalog = sectionCatalog(s.days);
+      const extra: Section[] = [];
+      const byLabel = new Map(catalog.map((sec) => [sec.label.toLowerCase(), sec]));
+      const defs: TaskDef[] = rows.map((r) => {
+        let sec = byLabel.get(r.sectionLabel.toLowerCase());
+        if (!sec) {
+          sec = {
+            id: `custom-${r.sectionLabel.toLowerCase().replace(/\s+/g, "-")}-${uid()}`,
+            label: r.sectionLabel,
+            color: "#6B7280",
+          };
+          byLabel.set(r.sectionLabel.toLowerCase(), sec);
+          extra.push(sec);
+        }
+        return {
+          id: uid(),
+          title: r.title,
+          points: r.points,
+          sectionId: sec.id,
+          weekday: r.weekday,
+          isStreak: r.isStreak,
+        };
+      });
+      const next: AppState = { ...s, taskDefs: [...s.taskDefs, ...defs] };
+      return { ...next, days: materializeWeek(next, s.days, extra) };
+    });
+  };
+
 
   if (!hydrated || !cloudReady) {
     return (
@@ -1071,13 +1133,22 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
             <ul className="space-y-1 text-sm">
               {state.history.map((h) => (
                 <li key={h.week}>
-                  <span className="font-semibold">Week {h.week}</span> ({h.range}
-                  ): {h.taskPct}% tasks · {h.ptsPct}% pts ({h.tasksDone}/
-                  {h.tasksTotal})
+                  <button
+                    onClick={() => setHistoryOpen(h)}
+                    className="text-left underline-offset-2 hover:underline"
+                  >
+                    <span className="font-semibold">Week {h.week}</span> ({h.range}
+                    ): {h.taskPct}% tasks · {h.ptsPct}% pts ({h.tasksDone}/
+                    {h.tasksTotal})
+                  </button>
                 </li>
               ))}
             </ul>
           </div>
+        )}
+
+        {historyOpen && (
+          <HistoryDetail week={historyOpen} onClose={() => setHistoryOpen(null)} />
         )}
 
         {/* Rollover */}
@@ -1092,9 +1163,29 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
             onClick={resetAll}
             className="rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-accent"
           >
-            Reset all
+            Uncheck all
           </button>
+          <button
+            onClick={exportCsv}
+            className="rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-accent"
+          >
+            ⬇ Export CSV
+          </button>
+          <label className="cursor-pointer rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-accent">
+            ⬆ Import CSV
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void importCsv(f);
+                e.target.value = "";
+              }}
+            />
+          </label>
         </div>
+
 
         {/* Day tabs */}
         <div className="mb-4 flex flex-wrap gap-2">
@@ -1139,6 +1230,7 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
           onNoteCarry={carryNote}
           onNoteDelete={deleteNote}
           onAddTask={addTask}
+          streaks={state.streaks ?? {}}
         />
 
         {/* Mini overview */}
@@ -1266,7 +1358,9 @@ interface DayPanelProps {
     sectionLabel?: string;
     sectionColor?: string;
     daily: boolean;
+    isStreak?: boolean;
   }) => void;
+  streaks: Record<string, StreakInfo>;
 }
 
 function DayPanel({
@@ -1286,6 +1380,7 @@ function DayPanel({
   onNoteCarry,
   onNoteDelete,
   onAddTask,
+  streaks,
 }: DayPanelProps) {
   const doneCount = day.tasks.filter((t) => t.status === "done").length;
   const totalCount = day.tasks.length;
@@ -1304,6 +1399,17 @@ function DayPanel({
     else s.add(id);
     setSelected(s);
   };
+
+  const selectMany = (ids: string[]) => {
+    const s = new Set(selected);
+    const allIn = ids.every((id) => s.has(id));
+    for (const id of ids) {
+      if (allIn) s.delete(id);
+      else s.add(id);
+    }
+    setSelected(s);
+  };
+
 
   // Group tasks by section, preserving order of day.sections
   const grouped = day.sections
@@ -1401,15 +1507,26 @@ function DayPanel({
       {/* Carried over */}
       {carriedTasks.length > 0 && (
         <div className="mb-4 rounded-lg border border-amber-400/50 bg-amber-500/10 p-3">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
-            ↻ Carried over today ({carriedTasks.length}{" "}
-            {carriedTasks.length === 1 ? "task" : "tasks"})
+          <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+            <span>
+              ↻ Carried over today ({carriedTasks.length}{" "}
+              {carriedTasks.length === 1 ? "task" : "tasks"})
+            </span>
+            {selectMode && (
+              <button
+                onClick={() => selectMany(carriedTasks.map((t) => t.id))}
+                className="rounded border border-amber-500/50 px-1.5 py-0.5 text-[10px] font-medium normal-case hover:bg-amber-500/20"
+              >
+                Select all carried
+              </button>
+            )}
           </h3>
           <div className="space-y-1.5">
             {carriedTasks.map((t) => (
               <TaskRow
                 key={t.id}
                 task={t}
+                streak={t.defId ? streaks[t.defId]?.count : undefined}
                 selectMode={selectMode}
                 selected={selected.has(t.id)}
                 onToggleSelect={() => toggleSelect(t.id)}
@@ -1417,6 +1534,7 @@ function DayPanel({
                 onDelete={() => onDeleteTask(t.id)}
               />
             ))}
+
           </div>
         </div>
       )}
@@ -1461,12 +1579,21 @@ function DayPanel({
               <span className="text-[11px] font-normal text-muted-foreground">
                 ({g.tasks.filter((t) => t.status === "done").length}/{g.tasks.length})
               </span>
+              {selectMode && (
+                <button
+                  onClick={() => selectMany(g.tasks.map((t) => t.id))}
+                  className="rounded border border-input px-1.5 py-0.5 text-[10px] font-medium hover:bg-accent"
+                >
+                  Select all
+                </button>
+              )}
             </h3>
             <div className="space-y-1.5">
               {g.tasks.map((t) => (
                 <TaskRow
                   key={t.id}
                   task={t}
+                  streak={t.defId ? streaks[t.defId]?.count : undefined}
                   selectMode={selectMode}
                   selected={selected.has(t.id)}
                   onToggleSelect={() => toggleSelect(t.id)}
@@ -1474,6 +1601,7 @@ function DayPanel({
                   onDelete={() => onDeleteTask(t.id)}
                 />
               ))}
+
             </div>
           </section>
         ))}
@@ -1555,6 +1683,7 @@ function DayPanel({
 
 function TaskRow({
   task,
+  streak,
   selectMode,
   selected,
   onToggleSelect,
@@ -1562,12 +1691,14 @@ function TaskRow({
   onDelete,
 }: {
   task: Task;
+  streak?: number;
   selectMode: boolean;
   selected: boolean;
   onToggleSelect: () => void;
   onCycle: () => void;
   onDelete: () => void;
 }) {
+
   const isDone = task.status === "done";
   const isCarry = task.status === "carry";
   const isUrgent = task.badges?.some((b) => b === "OVERDUE" || b === "URGENT");
@@ -1614,6 +1745,11 @@ function TaskRow({
         onClick={onCycle}
       >
         <span>{task.title}</span>
+        {task.isStreak && (
+          <span className="ml-2 rounded bg-orange-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 dark:text-orange-300">
+            🔥 {streak ?? 0} day{(streak ?? 0) === 1 ? "" : "s"}
+          </span>
+        )}
         {task.carriedFromDay && (
           <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:text-amber-300">
             ↻ from Day {task.carriedFromDay}
@@ -1666,6 +1802,7 @@ function AddTaskForm({
     sectionLabel?: string;
     sectionColor?: string;
     daily: boolean;
+    isStreak?: boolean;
   }) => void;
 }) {
   const [title, setTitle] = useState("");
@@ -1674,6 +1811,7 @@ function AddTaskForm({
   const [newSectionMode, setNewSectionMode] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
   const [daily, setDaily] = useState(false);
+  const [isStreak, setIsStreak] = useState(false);
 
   const submit = () => {
     if (!title.trim()) return;
@@ -1688,6 +1826,7 @@ function AddTaskForm({
         sectionLabel: name,
         sectionColor: "#6B7280",
         daily,
+        isStreak,
       });
     } else {
       const sec = sections.find((s) => s.id === sectionId);
@@ -1698,6 +1837,7 @@ function AddTaskForm({
         sectionLabel: sec?.label,
         sectionColor: sec?.color,
         daily,
+        isStreak,
       });
     }
     setTitle("");
@@ -1705,7 +1845,9 @@ function AddTaskForm({
     setNewSectionName("");
     setNewSectionMode(false);
     setDaily(false);
+    setIsStreak(false);
   };
+
 
   return (
     <div className="mt-6 rounded-lg border border-dashed border-border p-3">
@@ -1771,12 +1913,102 @@ function AddTaskForm({
           />
           <span>Daily (add to all 7 days)</span>
         </label>
+        <label className="flex cursor-pointer items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={isStreak}
+            onChange={(e) => setIsStreak(e.target.checked)}
+          />
+          <span>🔥 Streak task (daily chain)</span>
+        </label>
         <button
           onClick={submit}
           className="ml-auto rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
         >
           Add Task
         </button>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   WEEK HISTORY DETAIL
+   ========================================================================= */
+
+function HistoryDetail({ week, onClose }: { week: WeekHistory; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="mt-10 w-full max-w-2xl rounded-xl border border-border bg-card p-4 shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold">
+              Week {week.week} · {week.range}
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              {week.taskPct}% tasks · {week.ptsPct}% points ({week.tasksDone}/
+              {week.tasksTotal} done)
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent"
+          >
+            ✕ Close
+          </button>
+        </div>
+        {!week.days?.length ? (
+          <p className="text-sm text-muted-foreground">
+            No day-by-day detail was recorded for this week.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {week.days.map((d: HistoryDay, i: number) => {
+              const done = d.tasks.filter((t) => t.status === "done").length;
+              return (
+                <div key={i}>
+                  <h4 className="mb-1 text-sm font-semibold">
+                    Day {i + 1} · {d.date}{" "}
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      ({done}/{d.tasks.length})
+                    </span>
+                  </h4>
+                  <ul className="space-y-1">
+                    {d.tasks.map((t, j) => (
+                      <li
+                        key={j}
+                        className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1 text-xs"
+                      >
+                        <span>
+                          {t.status === "done" ? "✓" : t.status === "carry" ? "↻" : "•"}
+                        </span>
+                        <span
+                          className={`flex-1 ${
+                            t.status === "done" ? "line-through text-muted-foreground" : ""
+                          }`}
+                        >
+                          {t.title}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {t.sectionLabel}
+                        </span>
+                        <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-semibold">
+                          {t.points}pt
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
