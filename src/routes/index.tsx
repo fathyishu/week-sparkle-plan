@@ -540,13 +540,26 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
     setCloudReady(false);
     try {
       const raw = localStorage.getItem(`${STORAGE_KEY}:${syncUserId}`);
-      if (raw) setState(JSON.parse(raw));
-      else setState(initialState());
+      if (raw) {
+        const parsed = migrateState(JSON.parse(raw) as AppState);
+        setState({ ...parsed, days: materializeWeek(parsed, parsed.days) });
+      } else setState(initialState());
     } catch {
       /* ignore */
     }
     setHydrated(true);
   }, [syncUserId]);
+
+  // Normalise anything arriving from the cloud that predates permanent tasks.
+  useEffect(() => {
+    if (!hydrated) return;
+    setState((s) => {
+      if (s.taskDefs && s.taskDefs.length) return s;
+      const m = migrateState(s);
+      return { ...m, days: materializeWeek(m, m.days) };
+    });
+  }, [hydrated, state]);
+
 
   const { status: syncStatus, online, remotePulse } = useCloudSync<AppState>({
     userId: syncUserId,
