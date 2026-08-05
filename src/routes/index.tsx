@@ -1745,6 +1745,11 @@ function TaskRow({
         onClick={onCycle}
       >
         <span>{task.title}</span>
+        {task.isStreak && (
+          <span className="ml-2 rounded bg-orange-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 dark:text-orange-300">
+            🔥 {streak ?? 0} day{(streak ?? 0) === 1 ? "" : "s"}
+          </span>
+        )}
         {task.carriedFromDay && (
           <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:text-amber-300">
             ↻ from Day {task.carriedFromDay}
