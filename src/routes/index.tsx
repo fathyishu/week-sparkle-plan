@@ -791,13 +791,29 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
   };
 
   const bulkDelete = () => {
-    updateDay(activeDay - 1, (d) => ({
-      ...d,
-      tasks: d.tasks.filter((t) => !selected.has(t.id)),
-    }));
+    setState((s) => {
+      const dIdx = activeDay - 1;
+      const defIds = new Set(
+        s.days[dIdx].tasks
+          .filter((t) => selected.has(t.id) && t.defId)
+          .map((t) => t.defId as string),
+      );
+      return {
+        ...s,
+        taskDefs: s.taskDefs.filter((d) => !defIds.has(d.id)),
+        days: s.days.map((d, i) => ({
+          ...d,
+          tasks: d.tasks.filter((t) => {
+            if (t.defId && defIds.has(t.defId)) return false;
+            return !(i === dIdx && selected.has(t.id));
+          }),
+        })),
+      };
+    });
     setSelected(new Set());
     setSelectMode(false);
   };
+
 
   /* ---------- notes ---------- */
   const addNote = () => {
