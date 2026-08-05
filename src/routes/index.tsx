@@ -1683,6 +1683,7 @@ function DayPanel({
 
 function TaskRow({
   task,
+  streak,
   selectMode,
   selected,
   onToggleSelect,
@@ -1690,12 +1691,14 @@ function TaskRow({
   onDelete,
 }: {
   task: Task;
+  streak?: number;
   selectMode: boolean;
   selected: boolean;
   onToggleSelect: () => void;
   onCycle: () => void;
   onDelete: () => void;
 }) {
+
   const isDone = task.status === "done";
   const isCarry = task.status === "carry";
   const isUrgent = task.badges?.some((b) => b === "OVERDUE" || b === "URGENT");
