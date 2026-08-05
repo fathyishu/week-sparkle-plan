@@ -497,14 +497,17 @@ function buildDemoWeek(mondayISO: string): DayData[] {
 }
 
 function buildDemoState(): AppState {
-  return {
+  return migrateState({
     weekStartISO: MONDAY_JUNE_16.toISOString(),
     weekNumber: 1,
     days: buildDemoWeek(MONDAY_JUNE_16.toISOString()),
     history: [],
+    taskDefs: [],
+    streaks: {},
     ui: { isDemo: true, demoBannerDismissed: false },
-  };
+  });
 }
+
 
 const STORAGE_KEY = "weekly-tracker-v2";
 
