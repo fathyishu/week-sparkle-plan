@@ -36,62 +36,36 @@ function RouteRoot() {
 }
 
 /* =========================================================================
-   TYPES
+   TYPES — see src/lib/types.ts
    ========================================================================= */
-type TaskStatus = "pending" | "done" | "carry";
-type BadgeType = "OVERDUE" | "URGENT" | "MEETING" | "ONE-TIME";
+import type {
+  AppState,
+  BadgeType,
+  DayData,
+  HistoryDay,
+  Note,
+  Section,
+  Task,
+  TaskDef,
+  TaskStatus,
+  WeekHistory,
+} from "@/lib/types";
+import {
+  bumpStreak,
+  defsToCsv,
+  dropStreak,
+  fmtDate,
+  materializeWeek,
+  migrateState,
+  parseDefsCsv,
+  resetWeekToPending,
+  sectionCatalog,
+  shiftDays,
+  snapshotDays,
+  uid,
+  weekdayOf,
+} from "@/lib/tracker";
 
-interface Task {
-  id: string;
-  title: string;
-  points: number;
-  status: TaskStatus;
-  sectionId: string;
-  badges?: BadgeType[];
-  carriedFromDay?: number; // 1-indexed
-  custom?: boolean;
-}
-
-interface Section {
-  id: string;
-  label: string;
-  color: string; // hex
-}
-
-interface Note {
-  id: string;
-  text: string;
-  status: TaskStatus;
-  carriedFromDay?: number;
-}
-
-interface DayData {
-  date: string; // dd/M
-  isoDate: string;
-  sections: Section[]; // ordered
-  tasks: Task[];
-  notes: Note[];
-}
-
-interface WeekHistory {
-  week: number;
-  range: string;
-  taskPct: number;
-  ptsPct: number;
-  tasksDone: number;
-  tasksTotal: number;
-}
-
-interface AppState {
-  weekStartISO: string; // Monday
-  weekNumber: number;
-  days: DayData[];
-  history: WeekHistory[];
-  ui?: {
-    isDemo?: boolean;
-    demoBannerDismissed?: boolean;
-  };
-}
 
 /* =========================================================================
    BASE DATA — sections and seed tasks
