@@ -937,8 +937,51 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
       setState((s) => ({ ...s, days: materializeWeek(s, resetWeekToPending(s.days)) }));
       setActiveDay(1);
     }
-
   };
+
+  /* ---------- CSV export / import of permanent tasks ---------- */
+  const exportCsv = () => {
+    const csv = defsToCsv(state.taskDefs, sectionCatalog(state.days));
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `weekly-tasks-week-${state.weekNumber}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importCsv = async (file: File) => {
+    const rows = parseDefsCsv(await file.text());
+    if (!rows.length) return;
+    setState((s) => {
+      const catalog = sectionCatalog(s.days);
+      const extra: Section[] = [];
+      const byLabel = new Map(catalog.map((sec) => [sec.label.toLowerCase(), sec]));
+      const defs: TaskDef[] = rows.map((r) => {
+        let sec = byLabel.get(r.sectionLabel.toLowerCase());
+        if (!sec) {
+          sec = {
+            id: `custom-${r.sectionLabel.toLowerCase().replace(/\s+/g, "-")}-${uid()}`,
+            label: r.sectionLabel,
+            color: "#6B7280",
+          };
+          byLabel.set(r.sectionLabel.toLowerCase(), sec);
+          extra.push(sec);
+        }
+        return {
+          id: uid(),
+          title: r.title,
+          points: r.points,
+          sectionId: sec.id,
+          weekday: r.weekday,
+          isStreak: r.isStreak,
+        };
+      });
+      const next: AppState = { ...s, taskDefs: [...s.taskDefs, ...defs] };
+      return { ...next, days: materializeWeek(next, s.days, extra) };
+    });
+  };
+
 
   if (!hydrated || !cloudReady) {
     return (
