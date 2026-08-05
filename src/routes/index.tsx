@@ -1579,12 +1579,21 @@ function DayPanel({
               <span className="text-[11px] font-normal text-muted-foreground">
                 ({g.tasks.filter((t) => t.status === "done").length}/{g.tasks.length})
               </span>
+              {selectMode && (
+                <button
+                  onClick={() => selectMany(g.tasks.map((t) => t.id))}
+                  className="rounded border border-input px-1.5 py-0.5 text-[10px] font-medium hover:bg-accent"
+                >
+                  Select all
+                </button>
+              )}
             </h3>
             <div className="space-y-1.5">
               {g.tasks.map((t) => (
                 <TaskRow
                   key={t.id}
                   task={t}
+                  streak={t.defId ? streaks[t.defId]?.count : undefined}
                   selectMode={selectMode}
                   selected={selected.has(t.id)}
                   onToggleSelect={() => toggleSelect(t.id)}
@@ -1592,6 +1601,7 @@ function DayPanel({
                   onDelete={() => onDeleteTask(t.id)}
                 />
               ))}
+
             </div>
           </section>
         ))}
