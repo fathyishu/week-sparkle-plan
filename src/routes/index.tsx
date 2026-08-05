@@ -808,7 +808,7 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
     }));
   };
 
-  /* ---------- add task ---------- */
+  /* ---------- add task (creates a permanent TaskDef) ---------- */
   const addTask = (opts: {
     title: string;
     points: number;
@@ -816,45 +816,29 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
     sectionLabel?: string;
     sectionColor?: string;
     daily: boolean;
+    isStreak?: boolean;
   }) => {
     setState((s) => {
       const targetIdxs = opts.daily ? [0, 1, 2, 3, 4, 5, 6] : [activeDay - 1];
-      const newDays = s.days.map((d, i) => {
-        if (!targetIdxs.includes(i)) return d;
-        // ensure section exists on this day
-        let sections = d.sections;
-        if (!sections.some((sec) => sec.id === opts.sectionId)) {
-          sections = [
-            ...sections,
-            {
-              id: opts.sectionId,
-              label: opts.sectionLabel ?? opts.sectionId,
-              color: opts.sectionColor ?? "#6B7280",
-            },
-          ];
-        }
-        return {
-          ...d,
-          sections,
-          tasks: [
-            ...d.tasks,
-            {
-              id: uid(),
-              title: opts.title,
-              points: opts.points,
-              status: "pending" as TaskStatus,
-              sectionId: opts.sectionId,
-              custom: true,
-            } satisfies Task,
-
-          ],
-        };
-      });
-      return { ...s, days: newDays };
+      const newDefs: TaskDef[] = targetIdxs.map((i) => ({
+        id: uid(),
+        title: opts.title,
+        points: opts.points,
+        sectionId: opts.sectionId,
+        weekday: weekdayOf(s.days[i].isoDate),
+        isStreak: opts.isStreak,
+      }));
+      const section: Section = {
+        id: opts.sectionId,
+        label: opts.sectionLabel ?? opts.sectionId,
+        color: opts.sectionColor ?? "#6B7280",
+      };
+      const next: AppState = { ...s, taskDefs: [...s.taskDefs, ...newDefs] };
+      return { ...next, days: materializeWeek(next, s.days, [section]) };
     });
   };
 
-  /* ---------- week rollover ---------- */
+  /* ---------- week rollover (keeps every task, just unchecks) ---------- */
   const rollover = () => {
     setState((s) => {
       let totalDone = 0,
@@ -880,13 +864,16 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
         ptsPct: totalPtsAll ? Math.round((totalPts / totalPtsAll) * 100) : 0,
         tasksDone: totalDone,
         tasksTotal: totalTasks,
+        days: snapshotDays(s.days),
       };
       const nextMonday = new Date(s.weekStartISO);
       nextMonday.setDate(nextMonday.getDate() + 7);
+      const shifted = resetWeekToPending(shiftDays(s.days, 7));
       return {
+        ...s,
         weekStartISO: nextMonday.toISOString(),
         weekNumber: s.weekNumber + 1,
-        days: buildWeek(nextMonday.toISOString(), s.weekNumber + 1),
+        days: materializeWeek(s, shifted),
         history: [...s.history, snap],
       };
     });
@@ -894,10 +881,11 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
   };
 
   const resetAll = () => {
-    if (confirm("Reset entire tracker to Week 1? This clears all progress and history.")) {
-      setState(initialState());
+    if (confirm("Uncheck every task for this week? Your tasks and history are kept.")) {
+      setState((s) => ({ ...s, days: materializeWeek(s, resetWeekToPending(s.days)) }));
       setActiveDay(1);
     }
+
   };
 
   if (!hydrated || !cloudReady) {
