@@ -1132,13 +1132,22 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
             <ul className="space-y-1 text-sm">
               {state.history.map((h) => (
                 <li key={h.week}>
-                  <span className="font-semibold">Week {h.week}</span> ({h.range}
-                  ): {h.taskPct}% tasks · {h.ptsPct}% pts ({h.tasksDone}/
-                  {h.tasksTotal})
+                  <button
+                    onClick={() => setHistoryOpen(h)}
+                    className="text-left underline-offset-2 hover:underline"
+                  >
+                    <span className="font-semibold">Week {h.week}</span> ({h.range}
+                    ): {h.taskPct}% tasks · {h.ptsPct}% pts ({h.tasksDone}/
+                    {h.tasksTotal})
+                  </button>
                 </li>
               ))}
             </ul>
           </div>
+        )}
+
+        {historyOpen && (
+          <HistoryDetail week={historyOpen} onClose={() => setHistoryOpen(null)} />
         )}
 
         {/* Rollover */}
@@ -1153,9 +1162,29 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
             onClick={resetAll}
             className="rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-accent"
           >
-            Reset all
+            Uncheck all
           </button>
+          <button
+            onClick={exportCsv}
+            className="rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-accent"
+          >
+            ⬇ Export CSV
+          </button>
+          <label className="cursor-pointer rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-accent">
+            ⬆ Import CSV
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void importCsv(f);
+                e.target.value = "";
+              }}
+            />
+          </label>
         </div>
+
 
         {/* Day tabs */}
         <div className="mb-4 flex flex-wrap gap-2">
