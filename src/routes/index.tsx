@@ -1507,15 +1507,26 @@ function DayPanel({
       {/* Carried over */}
       {carriedTasks.length > 0 && (
         <div className="mb-4 rounded-lg border border-amber-400/50 bg-amber-500/10 p-3">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
-            ↻ Carried over today ({carriedTasks.length}{" "}
-            {carriedTasks.length === 1 ? "task" : "tasks"})
+          <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+            <span>
+              ↻ Carried over today ({carriedTasks.length}{" "}
+              {carriedTasks.length === 1 ? "task" : "tasks"})
+            </span>
+            {selectMode && (
+              <button
+                onClick={() => selectMany(carriedTasks.map((t) => t.id))}
+                className="rounded border border-amber-500/50 px-1.5 py-0.5 text-[10px] font-medium normal-case hover:bg-amber-500/20"
+              >
+                Select all carried
+              </button>
+            )}
           </h3>
           <div className="space-y-1.5">
             {carriedTasks.map((t) => (
               <TaskRow
                 key={t.id}
                 task={t}
+                streak={t.defId ? streaks[t.defId]?.count : undefined}
                 selectMode={selectMode}
                 selected={selected.has(t.id)}
                 onToggleSelect={() => toggleSelect(t.id)}
@@ -1523,6 +1534,7 @@ function DayPanel({
                 onDelete={() => onDeleteTask(t.id)}
               />
             ))}
+
           </div>
         </div>
       )}
