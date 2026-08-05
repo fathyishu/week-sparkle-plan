@@ -1229,6 +1229,7 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
           onNoteCarry={carryNote}
           onNoteDelete={deleteNote}
           onAddTask={addTask}
+          streaks={state.streaks ?? {}}
         />
 
         {/* Mini overview */}
