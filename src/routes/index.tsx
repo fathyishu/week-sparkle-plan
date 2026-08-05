@@ -1357,7 +1357,9 @@ interface DayPanelProps {
     sectionLabel?: string;
     sectionColor?: string;
     daily: boolean;
+    isStreak?: boolean;
   }) => void;
+  streaks: Record<string, StreakInfo>;
 }
 
 function DayPanel({
@@ -1377,6 +1379,7 @@ function DayPanel({
   onNoteCarry,
   onNoteDelete,
   onAddTask,
+  streaks,
 }: DayPanelProps) {
   const doneCount = day.tasks.filter((t) => t.status === "done").length;
   const totalCount = day.tasks.length;
@@ -1395,6 +1398,17 @@ function DayPanel({
     else s.add(id);
     setSelected(s);
   };
+
+  const selectMany = (ids: string[]) => {
+    const s = new Set(selected);
+    const allIn = ids.every((id) => s.has(id));
+    for (const id of ids) {
+      if (allIn) s.delete(id);
+      else s.add(id);
+    }
+    setSelected(s);
+  };
+
 
   // Group tasks by section, preserving order of day.sections
   const grouped = day.sections
