@@ -711,16 +711,39 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
         };
       }
 
-      return { ...s, days: newDays };
+      // Streak bookkeeping
+      let streaks = s.streaks ?? {};
+      if (t.isStreak && t.defId) {
+        if (nextStatus === "done") {
+          streaks = { ...streaks, [t.defId]: bumpStreak(streaks[t.defId], d.isoDate) };
+        } else if (prevStatus === "done") {
+          streaks = { ...streaks, [t.defId]: dropStreak(streaks[t.defId], d.isoDate) };
+        }
+      }
+
+      return { ...s, days: newDays, streaks };
     });
   };
 
+  /** Deleting a task removes its permanent definition too. */
   const deleteTask = (taskId: string) => {
-    updateDay(activeDay - 1, (d) => ({
-      ...d,
-      tasks: d.tasks.filter((t) => t.id !== taskId),
-    }));
+    setState((s) => {
+      const dIdx = activeDay - 1;
+      const target = s.days[dIdx].tasks.find((t) => t.id === taskId);
+      const defId = target?.defId;
+      return {
+        ...s,
+        taskDefs: defId ? s.taskDefs.filter((d) => d.id !== defId) : s.taskDefs,
+        days: s.days.map((d, i) => ({
+          ...d,
+          tasks: d.tasks.filter((t) =>
+            defId ? t.defId !== defId : !(i === dIdx && t.id === taskId),
+          ),
+        })),
+      };
+    });
   };
+
 
   const bulkMoveCarry = () => {
     setState((s) => {
