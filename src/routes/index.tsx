@@ -412,13 +412,16 @@ function buildWeek(mondayISO: string, weekNumber: number): DayData[] {
 }
 
 function initialState(): AppState {
-  return {
+  return migrateState({
     weekStartISO: MONDAY_JUNE_16.toISOString(),
     weekNumber: 1,
     days: buildWeek(MONDAY_JUNE_16.toISOString(), 1),
     history: [],
-  };
+    taskDefs: [],
+    streaks: {},
+  });
 }
+
 
 /* Demo starter template shown to first-time users */
 const DEMO_SECTIONS: Section[] = [
