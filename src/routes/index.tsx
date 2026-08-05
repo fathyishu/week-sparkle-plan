@@ -45,6 +45,7 @@ import type {
   HistoryDay,
   Note,
   Section,
+  StreakInfo,
   Task,
   TaskDef,
   TaskStatus,
