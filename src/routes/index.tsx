@@ -1931,3 +1931,85 @@ function AddTaskForm({
     </div>
   );
 }
+
+/* =========================================================================
+   WEEK HISTORY DETAIL
+   ========================================================================= */
+
+function HistoryDetail({ week, onClose }: { week: WeekHistory; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="mt-10 w-full max-w-2xl rounded-xl border border-border bg-card p-4 shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold">
+              Week {week.week} · {week.range}
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              {week.taskPct}% tasks · {week.ptsPct}% points ({week.tasksDone}/
+              {week.tasksTotal} done)
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent"
+          >
+            ✕ Close
+          </button>
+        </div>
+        {!week.days?.length ? (
+          <p className="text-sm text-muted-foreground">
+            No day-by-day detail was recorded for this week.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {week.days.map((d: HistoryDay, i: number) => {
+              const done = d.tasks.filter((t) => t.status === "done").length;
+              return (
+                <div key={i}>
+                  <h4 className="mb-1 text-sm font-semibold">
+                    Day {i + 1} · {d.date}{" "}
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      ({done}/{d.tasks.length})
+                    </span>
+                  </h4>
+                  <ul className="space-y-1">
+                    {d.tasks.map((t, j) => (
+                      <li
+                        key={j}
+                        className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1 text-xs"
+                      >
+                        <span>
+                          {t.status === "done" ? "✓" : t.status === "carry" ? "↻" : "•"}
+                        </span>
+                        <span
+                          className={`flex-1 ${
+                            t.status === "done" ? "line-through text-muted-foreground" : ""
+                          }`}
+                        >
+                          {t.title}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {t.sectionLabel}
+                        </span>
+                        <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-semibold">
+                          {t.points}pt
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
