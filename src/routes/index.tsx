@@ -534,6 +534,7 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
   const [activeDay, setActiveDay] = useState(1); // 1-indexed
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [historyOpen, setHistoryOpen] = useState<WeekHistory | null>(null);
 
   useEffect(() => {
     setHydrated(false);
