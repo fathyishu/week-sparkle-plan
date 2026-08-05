@@ -330,11 +330,8 @@ const ONE_TIME_BY_DAY: Record<number, Seed[]> = {
    HELPERS
    ========================================================================= */
 
-const uid = () => Math.random().toString(36).slice(2, 11);
-
 const MONDAY_JUNE_16 = new Date(2026, 6, 10); // Day 1 = Friday July 10, 2026
 
-const fmtDate = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}`;
 
 function buildWeek(mondayISO: string, weekNumber: number): DayData[] {
   const monday = new Date(mondayISO);
