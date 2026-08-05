@@ -1802,6 +1802,7 @@ function AddTaskForm({
     sectionLabel?: string;
     sectionColor?: string;
     daily: boolean;
+    isStreak?: boolean;
   }) => void;
 }) {
   const [title, setTitle] = useState("");
@@ -1810,6 +1811,7 @@ function AddTaskForm({
   const [newSectionMode, setNewSectionMode] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
   const [daily, setDaily] = useState(false);
+  const [isStreak, setIsStreak] = useState(false);
 
   const submit = () => {
     if (!title.trim()) return;
@@ -1824,6 +1826,7 @@ function AddTaskForm({
         sectionLabel: name,
         sectionColor: "#6B7280",
         daily,
+        isStreak,
       });
     } else {
       const sec = sections.find((s) => s.id === sectionId);
@@ -1834,6 +1837,7 @@ function AddTaskForm({
         sectionLabel: sec?.label,
         sectionColor: sec?.color,
         daily,
+        isStreak,
       });
     }
     setTitle("");
@@ -1841,7 +1845,9 @@ function AddTaskForm({
     setNewSectionName("");
     setNewSectionMode(false);
     setDaily(false);
+    setIsStreak(false);
   };
+
 
   return (
     <div className="mt-6 rounded-lg border border-dashed border-border p-3">
