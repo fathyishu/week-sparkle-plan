@@ -128,6 +128,51 @@ export type Database = {
         }
         Relationships: []
       }
+      friendships: {
+        Row: {
+          avatar_a: string | null
+          avatar_b: string | null
+          created_at: string
+          id: string
+          invited_email: string
+          name_a: string | null
+          name_b: string | null
+          requested_by: string
+          status: string
+          updated_at: string
+          user_id_a: string
+          user_id_b: string | null
+        }
+        Insert: {
+          avatar_a?: string | null
+          avatar_b?: string | null
+          created_at?: string
+          id?: string
+          invited_email: string
+          name_a?: string | null
+          name_b?: string | null
+          requested_by: string
+          status?: string
+          updated_at?: string
+          user_id_a: string
+          user_id_b?: string | null
+        }
+        Update: {
+          avatar_a?: string | null
+          avatar_b?: string | null
+          created_at?: string
+          id?: string
+          invited_email?: string
+          name_a?: string | null
+          name_b?: string | null
+          requested_by?: string
+          status?: string
+          updated_at?: string
+          user_id_a?: string
+          user_id_b?: string | null
+        }
+        Relationships: []
+      }
       group_invitations: {
         Row: {
           created_at: string
@@ -620,6 +665,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      friends_points: {
+        Args: { _end?: string; _start?: string }
+        Returns: {
+          points: number
+          tasks_done: number
+          user_id: string
+        }[]
+      }
       is_group_member: {
         Args: { _group: string; _user: string }
         Returns: boolean
