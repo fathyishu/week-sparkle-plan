@@ -188,7 +188,8 @@ export function useCloudSync<T>({
         const parsed = JSON.parse(queued) as T;
         const { error } = await supabase
           .from("user_app_state")
-          .upsert({ user_id: userId, data: parsed as never });
+          .update({ data: parsed as never })
+          .eq("user_id", userId);
         if (!error) {
           lastRemoteHash.current = queued;
           localStorage.removeItem(`cloud-queue:${userId}`);
