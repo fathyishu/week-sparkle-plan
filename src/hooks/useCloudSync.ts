@@ -140,9 +140,12 @@ export function useCloudSync<T>({
         return;
       }
       setStatus("saving");
+      // UPDATE (not upsert): upsert is checked against the INSERT policy, which a
+      // mentor editing a mentee's row can never satisfy.
       const { error } = await supabase
         .from("user_app_state")
-        .upsert({ user_id: userId, data: pendingRef.current as never });
+        .update({ data: pendingRef.current as never })
+        .eq("user_id", userId);
       if (error) {
         console.error("[cloud-sync] save error", error);
         setStatus("error");
