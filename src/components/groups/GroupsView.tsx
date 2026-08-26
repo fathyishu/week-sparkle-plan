@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDateRangeFilter } from "@/components/DateRangeFilter";
+import { inRange } from "@/lib/dateRange";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -532,7 +534,7 @@ function GroupDetail({
         />
       )}
       {showAddTask && (
-        <QuickAddTaskModal
+        <AddTaskModal
           user={user}
           groupId={groupId}
           onClose={() => setShowAddTask(false)}
@@ -544,6 +546,7 @@ function GroupDetail({
 
 /* ================================================================== */
 function GroupBoard({ user, groupId }: { user: User; groupId: string }) {
+  const [addingIn, setAddingIn] = useState<TaskRow["status"] | null>(null);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [editing, setEditing] = useState<TaskRow | null>(null);
@@ -652,17 +655,7 @@ function GroupBoard({ user, groupId }: { user: User; groupId: string }) {
             tasks={tasks.filter((t) => t.status === c.key)}
             members={members}
             onEdit={(t) => setEditing(t)}
-            onAdd={async (title) => {
-              await supabase.from("group_tasks").insert({
-                group_id: groupId,
-                title,
-                created_by: user.id,
-                status: c.key,
-                pts: 5,
-                priority: "medium",
-                position: tasks.length,
-              });
-            }}
+            onAdd={() => setAddingIn(c.key)}
           />
         ))}
       </div>
@@ -672,6 +665,14 @@ function GroupBoard({ user, groupId }: { user: User; groupId: string }) {
           task={editing}
           members={members}
           onClose={() => setEditing(null)}
+        />
+      )}
+      {addingIn && (
+        <AddTaskModal
+          user={user}
+          groupId={groupId}
+          initialStatus={addingIn}
+          onClose={() => setAddingIn(null)}
         />
       )}
     </DndContext>
@@ -691,7 +692,7 @@ function Column({
   tasks: TaskRow[];
   members: MemberRow[];
   onEdit: (t: TaskRow) => void;
-  onAdd: (title: string) => void;
+  onAdd: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   const [adding, setAdding] = useState(false);
@@ -712,51 +713,10 @@ function Column({
           <TaskCard key={t.id} task={t} members={members} onEdit={() => onEdit(t)} />
         ))}
       </div>
-      {adding ? (
-        <div className="mt-2 space-y-2">
-          <input
-            autoFocus
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && title.trim()) {
-                onAdd(title.trim());
-                setTitle("");
-                setAdding(false);
-              }
-            }}
-            placeholder="Task title…"
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-          />
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => {
-                setAdding(false);
-                setTitle("");
-              }}
-              className="rounded-md px-2 py-1 text-xs"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => {
-                if (title.trim()) {
-                  onAdd(title.trim());
-                  setTitle("");
-                  setAdding(false);
-                }
-              }}
-              className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground"
-            >
-              Add
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button
-          onClick={() => setAdding(true)}
-          className="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-border py-1.5 text-xs text-muted-foreground hover:text-foreground"
-        >
+      <button
+        onClick={() => onAdd()}
+        className="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-border py-1.5 text-xs text-muted-foreground hover:text-foreground"
+      >
           <Plus className="h-3 w-3" /> Add Task
         </button>
       )}
