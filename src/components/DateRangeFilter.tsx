@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import type React from "react";
 import {
   RANGE_OPTIONS,
   buildRange,
@@ -25,7 +26,11 @@ export function useDateRangeFilter(initial: RangePreset = "week") {
       setCustomEnd={setCustomEnd}
     />
   );
-  return { range, control, preset } as { range: DateRange; control: JSX.Element; preset: RangePreset };
+  return { range, control, preset } as {
+    range: DateRange;
+    control: React.ReactElement;
+    preset: RangePreset;
+  };
 }
 
 export function DateRangeFilter({

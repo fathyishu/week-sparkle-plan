@@ -137,8 +137,8 @@ export function FriendsView({ user }: { user: User }) {
     const [{ data: fs }, { data: pts }] = await Promise.all([
       supabase.from("friendships").select("*"),
       supabase.rpc("friends_points", {
-        _start: toDateParam(range.start),
-        _end: toDateParam(range.end),
+        _start: toDateParam(range.start) ?? undefined,
+        _end: toDateParam(range.end) ?? undefined,
       }),
     ]);
     const friendships = (fs ?? []) as FriendshipRow[];
