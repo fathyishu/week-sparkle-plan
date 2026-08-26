@@ -695,8 +695,6 @@ function Column({
   onAdd: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
-  const [adding, setAdding] = useState(false);
-  const [title, setTitle] = useState("");
   return (
     <div
       ref={setNodeRef}
@@ -717,9 +715,8 @@ function Column({
         onClick={() => onAdd()}
         className="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-border py-1.5 text-xs text-muted-foreground hover:text-foreground"
       >
-          <Plus className="h-3 w-3" /> Add Task
-        </button>
-      )}
+        <Plus className="h-3 w-3" /> Add Task
+      </button>
     </div>
   );
 }
