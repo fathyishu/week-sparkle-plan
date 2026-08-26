@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDateRangeFilter } from "@/components/DateRangeFilter";
+import { inRange } from "@/lib/dateRange";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -532,7 +534,7 @@ function GroupDetail({
         />
       )}
       {showAddTask && (
-        <QuickAddTaskModal
+        <AddTaskModal
           user={user}
           groupId={groupId}
           onClose={() => setShowAddTask(false)}
@@ -544,6 +546,7 @@ function GroupDetail({
 
 /* ================================================================== */
 function GroupBoard({ user, groupId }: { user: User; groupId: string }) {
+  const [addingIn, setAddingIn] = useState<TaskRow["status"] | null>(null);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [editing, setEditing] = useState<TaskRow | null>(null);
@@ -652,17 +655,7 @@ function GroupBoard({ user, groupId }: { user: User; groupId: string }) {
             tasks={tasks.filter((t) => t.status === c.key)}
             members={members}
             onEdit={(t) => setEditing(t)}
-            onAdd={async (title) => {
-              await supabase.from("group_tasks").insert({
-                group_id: groupId,
-                title,
-                created_by: user.id,
-                status: c.key,
-                pts: 5,
-                priority: "medium",
-                position: tasks.length,
-              });
-            }}
+            onAdd={() => setAddingIn(c.key)}
           />
         ))}
       </div>
@@ -672,6 +665,14 @@ function GroupBoard({ user, groupId }: { user: User; groupId: string }) {
           task={editing}
           members={members}
           onClose={() => setEditing(null)}
+        />
+      )}
+      {addingIn && (
+        <AddTaskModal
+          user={user}
+          groupId={groupId}
+          initialStatus={addingIn}
+          onClose={() => setAddingIn(null)}
         />
       )}
     </DndContext>
@@ -691,11 +692,9 @@ function Column({
   tasks: TaskRow[];
   members: MemberRow[];
   onEdit: (t: TaskRow) => void;
-  onAdd: (title: string) => void;
+  onAdd: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
-  const [adding, setAdding] = useState(false);
-  const [title, setTitle] = useState("");
   return (
     <div
       ref={setNodeRef}
@@ -712,54 +711,12 @@ function Column({
           <TaskCard key={t.id} task={t} members={members} onEdit={() => onEdit(t)} />
         ))}
       </div>
-      {adding ? (
-        <div className="mt-2 space-y-2">
-          <input
-            autoFocus
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && title.trim()) {
-                onAdd(title.trim());
-                setTitle("");
-                setAdding(false);
-              }
-            }}
-            placeholder="Task title…"
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-          />
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => {
-                setAdding(false);
-                setTitle("");
-              }}
-              className="rounded-md px-2 py-1 text-xs"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => {
-                if (title.trim()) {
-                  onAdd(title.trim());
-                  setTitle("");
-                  setAdding(false);
-                }
-              }}
-              className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground"
-            >
-              Add
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button
-          onClick={() => setAdding(true)}
-          className="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-border py-1.5 text-xs text-muted-foreground hover:text-foreground"
-        >
-          <Plus className="h-3 w-3" /> Add Task
-        </button>
-      )}
+      <button
+        onClick={() => onAdd()}
+        className="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-border py-1.5 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <Plus className="h-3 w-3" /> Add Task
+      </button>
     </div>
   );
 }
@@ -1226,58 +1183,105 @@ function GroupSections({ groupId, isOwner }: { groupId: string; isOwner: boolean
 
 /* ================================================================== */
 function GroupLeaderboard({ groupId }: { groupId: string }) {
-  const [rows, setRows] = useState<(WeeklyPoints & { member?: MemberRow })[]>([]);
-  useEffect(() => {
-    const wk = isoMondayOf();
-    (async () => {
-      const [{ data: pts }, { data: mem }] = await Promise.all([
-        supabase
-          .from("group_weekly_points")
-          .select("*")
-          .eq("group_id", groupId)
-          .eq("week_start", wk),
-        supabase.from("group_members").select("*").eq("group_id", groupId),
-      ]);
-      const memList = (mem ?? []) as MemberRow[];
-      const list = (pts ?? []).map((p) => ({
-        ...(p as WeeklyPoints),
-        member: memList.find((m) => m.user_id === (p as WeeklyPoints).user_id),
-      }));
-      list.sort((a, b) => b.points - a.points);
-      setRows(list);
-    })();
+  const { range, control } = useDateRangeFilter("week");
+  const [points, setPoints] = useState<WeeklyPoints[]>([]);
+  const [members, setMembers] = useState<MemberRow[]>([]);
+
+  const load = useCallback(async () => {
+    const [{ data: pts }, { data: mem }] = await Promise.all([
+      supabase.from("group_weekly_points").select("*").eq("group_id", groupId),
+      supabase.from("group_members").select("*").eq("group_id", groupId),
+    ]);
+    setPoints((pts ?? []) as WeeklyPoints[]);
+    setMembers((mem ?? []) as MemberRow[]);
   }, [groupId]);
 
-  const week = useMemo(() => isoMondayOf(), []);
+  // Live updates — filter state lives outside this effect, so a realtime
+  // refresh never resets the selected range.
+  useEffect(() => {
+    load();
+    const ch = supabase
+      .channel(`leaderboard:${groupId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "group_weekly_points",
+          filter: `group_id=eq.${groupId}`,
+        },
+        () => load(),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "group_tasks",
+          filter: `group_id=eq.${groupId}`,
+        },
+        () => load(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [groupId, load]);
+
+  const rows = useMemo(() => {
+    const agg = new Map<string, { points: number; tasks_done: number }>();
+    for (const p of points) {
+      // shared date-range filter (week / month / lifetime / custom)
+      if (!inRange(p.week_start, range)) continue;
+      const cur = agg.get(p.user_id) ?? { points: 0, tasks_done: 0 };
+      cur.points += p.points;
+      cur.tasks_done += p.tasks_done;
+      agg.set(p.user_id, cur);
+    }
+    return [...agg.entries()]
+      .map(([user_id, v]) => ({
+        user_id,
+        ...v,
+        member: members.find((m) => m.user_id === user_id),
+      }))
+      .sort((a, b) => b.points - a.points);
+  }, [points, members, range]);
+
   return (
-    <div className="rounded-lg border border-border bg-card">
-      <div className="border-b border-border px-3 py-2 text-xs text-muted-foreground">
-        Week of {week}
+    <div className="space-y-3">
+      <div>{control}</div>
+      <div className="rounded-lg border border-border bg-card">
+        {rows.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            No points earned in this period yet. Complete tasks to appear here!
+          </p>
+        ) : (
+          rows.map((r, i) => (
+            <div
+              key={r.user_id}
+              className="flex items-center gap-3 border-b border-border p-3 last:border-b-0"
+            >
+              <span className="w-6 text-center text-sm font-bold text-muted-foreground">
+                {i + 1}
+              </span>
+              {r.member ? (
+                <Avatar m={r.member} size={32} />
+              ) : (
+                <div className="h-8 w-8 rounded-full bg-secondary" />
+              )}
+              <div className="flex-1 text-sm font-medium">
+                {r.member?.display_name ?? r.user_id.slice(0, 8)}
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-semibold">{r.points} pts</div>
+                <div className="text-[11px] text-muted-foreground">
+                  {r.tasks_done} tasks
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
-      {rows.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          No points earned yet this week. Complete tasks to appear here!
-        </p>
-      ) : (
-        rows.map((r, i) => (
-          <div
-            key={r.user_id}
-            className="flex items-center gap-3 border-b border-border p-3 last:border-b-0"
-          >
-            <span className="w-6 text-center text-sm font-bold text-muted-foreground">
-              {i + 1}
-            </span>
-            {r.member ? <Avatar m={r.member} size={32} /> : <div className="h-8 w-8 rounded-full bg-secondary" />}
-            <div className="flex-1 text-sm font-medium">
-              {r.member?.display_name ?? r.user_id.slice(0, 8)}
-            </div>
-            <div className="text-right">
-              <div className="text-sm font-semibold">{r.points} pts</div>
-              <div className="text-[11px] text-muted-foreground">{r.tasks_done} tasks</div>
-            </div>
-          </div>
-        ))
-      )}
     </div>
   );
 }
@@ -1309,29 +1313,50 @@ function Modal({
 }
 
 /* ================================================================== */
-function QuickAddTaskModal({
+function AddTaskModal({
   user,
   groupId,
+  initialStatus = "todo",
   onClose,
 }: {
   user: User;
   groupId: string;
+  initialStatus?: TaskRow["status"];
   onClose: () => void;
 }) {
   const [title, setTitle] = useState("");
-  const [pts, setPts] = useState(5);
+  const [description, setDescription] = useState("");
+  const [assignedTo, setAssignedTo] = useState<string>("");
+  const [status, setStatus] = useState<TaskRow["status"]>(initialStatus);
   const [priority, setPriority] = useState<TaskRow["priority"]>("medium");
+  const [pts, setPts] = useState(5);
+  const [dueDate, setDueDate] = useState("");
+  const [members, setMembers] = useState<MemberRow[]>([]);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("group_members")
+        .select("*")
+        .eq("group_id", groupId);
+      setMembers((data ?? []) as MemberRow[]);
+    })();
+  }, [groupId]);
+
   const submit = async () => {
     if (!title.trim()) return;
     setBusy(true);
     const { error } = await supabase.from("group_tasks").insert({
       group_id: groupId,
       title: title.trim(),
+      description: description.trim() || null,
+      assigned_to: assignedTo || null,
       created_by: user.id,
-      status: "todo",
+      status,
       pts,
       priority,
+      due_date: dueDate || null,
       position: 0,
     });
     setBusy(false);
@@ -1341,6 +1366,7 @@ function QuickAddTaskModal({
     }
     onClose();
   };
+
   return (
     <Modal onClose={onClose} title="Add Task">
       <div className="space-y-3">
@@ -1349,9 +1375,43 @@ function QuickAddTaskModal({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="What needs doing?"
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-medium"
+        />
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={3}
+          placeholder="Description"
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
         />
         <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium">Assign to</label>
+            <select
+              value={assignedTo}
+              onChange={(e) => setAssignedTo(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            >
+              <option value="">Unassigned</option>
+              {members.map((m) => (
+                <option key={m.id} value={m.user_id}>
+                  {m.display_name ?? m.email}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium">Status</label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as TaskRow["status"])}
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            >
+              <option value="todo">To Do</option>
+              <option value="inprogress">In Progress</option>
+              <option value="done">Done</option>
+            </select>
+          </div>
           <div>
             <label className="mb-1 block text-xs font-medium">Priority</label>
             <select
@@ -1375,6 +1435,15 @@ function QuickAddTaskModal({
               className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
             />
           </div>
+          <div className="col-span-2">
+            <label className="mb-1 block text-xs font-medium">Due date</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            />
+          </div>
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <button onClick={onClose} className="rounded-md border border-border px-3 py-1.5 text-sm">
@@ -1385,7 +1454,7 @@ function QuickAddTaskModal({
             disabled={busy || !title.trim()}
             className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
           >
-            Add
+            Add Task
           </button>
         </div>
       </div>

@@ -8,11 +8,17 @@ import {
   GraduationCap,
   ChevronDown,
   ChevronRight,
+  Trophy,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
-export type AppView = "personal" | "groups" | "notifications" | "mentors";
+export type AppView =
+  | "personal"
+  | "groups"
+  | "notifications"
+  | "mentors"
+  | "friends";
 
 interface Props {
   view: AppView;
@@ -35,6 +41,7 @@ export function AppShell({
 }: Props) {
   const [inviteCount, setInviteCount] = useState(0);
   const [mentorReqCount, setMentorReqCount] = useState(0);
+  const [friendReqCount, setFriendReqCount] = useState(0);
   const [groups, setGroups] = useState<SidebarGroup[]>([]);
   const [groupsExpanded, setGroupsExpanded] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -43,7 +50,7 @@ export function AppShell({
   useEffect(() => {
     let cancel = false;
     const load = async () => {
-      const [{ data: gs }, invRes, mentRes] = await Promise.all([
+      const [{ data: gs }, invRes, mentRes, friendRes] = await Promise.all([
         supabase.from("groups").select("id,name").order("created_at"),
         email
           ? supabase
@@ -59,11 +66,19 @@ export function AppShell({
               .eq("status", "pending")
               .ilike("mentee_email", email)
           : Promise.resolve({ count: 0 } as { count: number | null }),
+        email
+          ? supabase
+              .from("friendships")
+              .select("id", { count: "exact", head: true })
+              .eq("status", "pending")
+              .ilike("invited_email", email)
+          : Promise.resolve({ count: 0 } as { count: number | null }),
       ]);
       if (cancel) return;
       setGroups((gs ?? []) as SidebarGroup[]);
       setInviteCount((invRes as { count: number | null }).count ?? 0);
       setMentorReqCount((mentRes as { count: number | null }).count ?? 0);
+      setFriendReqCount((friendRes as { count: number | null }).count ?? 0);
     };
     load();
     const channel = supabase
@@ -88,6 +103,11 @@ export function AppShell({
         { event: "*", schema: "public", table: "mentorships" },
         load,
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "friendships" },
+        load,
+      )
       .subscribe();
     return () => {
       cancel = true;
@@ -95,7 +115,7 @@ export function AppShell({
     };
   }, [user.id, email]);
 
-  const notifCount = inviteCount + mentorReqCount;
+  const notifCount = inviteCount + mentorReqCount + friendReqCount;
 
   const openGroup = (id: string) => {
     setSelectedGroupId(id);
@@ -186,6 +206,17 @@ export function AppShell({
             {notifCount}
           </span>
         )}
+      </button>
+
+      <button
+        onClick={() => {
+          setView("friends");
+          setMobileOpen(false);
+        }}
+        className={itemClass(view === "friends")}
+      >
+        <Trophy className="h-4 w-4" />
+        <span>Friends & Leaderboard</span>
       </button>
 
       <button
