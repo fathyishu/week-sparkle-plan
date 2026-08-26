@@ -62,6 +62,9 @@ export interface HistoryDay {
 export interface WeekHistory {
   week: number;
   range: string;
+  /** ISO bounds of the week, used by the shared date-range filter. */
+  startISO?: string;
+  endISO?: string;
   taskPct: number;
   ptsPct: number;
   tasksDone: number;
@@ -74,6 +77,23 @@ export interface StreakInfo {
   lastDoneDate?: string; // yyyy-mm-dd
 }
 
+/**
+ * A task manually "conveyed" to next week via the selection-only action.
+ * Completely separate from the 7-day rollover/carry-forward feature.
+ */
+export interface ConveyedTask {
+  id: string;
+  title: string;
+  points: number;
+  sectionId: string;
+  sectionLabel?: string;
+  sectionColor?: string;
+  isStreak?: boolean;
+  /** weekNumber this item should surface on (day 1). */
+  targetWeek: number;
+  status: TaskStatus;
+}
+
 export interface TrackerState {
   weekStartISO: string;
   weekNumber: number;
@@ -82,6 +102,8 @@ export interface TrackerState {
   /** Permanent task definitions — the source of truth for what exists each week */
   taskDefs: TaskDef[];
   streaks?: Record<string, StreakInfo>;
+  /** Manually conveyed tasks — independent of rollover. */
+  conveyed?: ConveyedTask[];
   ui?: {
     isDemo?: boolean;
     demoBannerDismissed?: boolean;
