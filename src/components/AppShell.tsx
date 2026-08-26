@@ -12,7 +12,12 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
-export type AppView = "personal" | "groups" | "notifications" | "mentors";
+export type AppView =
+  | "personal"
+  | "groups"
+  | "notifications"
+  | "mentors"
+  | "friends";
 
 interface Props {
   view: AppView;
