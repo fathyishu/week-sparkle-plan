@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { Bell, Users as UsersIcon, GraduationCap, Check, X } from "lucide-react";
+import { Bell, Users as UsersIcon, GraduationCap, Check, X, UserPlus } from "lucide-react";
+import type { FriendshipRow } from "@/components/FriendsView";
+import { avatarOf, displayName } from "@/components/FriendsView";
 
 type GroupInvite = {
   id: string;
@@ -26,12 +28,13 @@ type MentorReq = {
 export function NotificationsView({ user }: { user: User }) {
   const [invites, setInvites] = useState<GroupInvite[]>([]);
   const [mentorReqs, setMentorReqs] = useState<MentorReq[]>([]);
+  const [friendReqs, setFriendReqs] = useState<FriendshipRow[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const email = (user.email ?? "").toLowerCase();
 
   const load = async () => {
     if (!email) return;
-    const [{ data: inv }, { data: mr }] = await Promise.all([
+    const [{ data: inv }, { data: mr }, { data: fr }] = await Promise.all([
       supabase
         .from("group_invitations")
         .select("*")
@@ -42,6 +45,11 @@ export function NotificationsView({ user }: { user: User }) {
         .select("*")
         .eq("status", "pending")
         .ilike("mentee_email", email),
+      supabase
+        .from("friendships")
+        .select("*")
+        .eq("status", "pending")
+        .ilike("invited_email", email),
     ]);
     const invList = (inv ?? []) as GroupInvite[];
     if (invList.length) {
@@ -53,6 +61,7 @@ export function NotificationsView({ user }: { user: User }) {
     }
     setInvites(invList);
     setMentorReqs((mr ?? []) as MentorReq[]);
+    setFriendReqs(((fr ?? []) as FriendshipRow[]).filter((f) => f.requested_by !== user.id));
   };
 
   useEffect(() => {
@@ -67,6 +76,11 @@ export function NotificationsView({ user }: { user: User }) {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "mentorships" },
+        load,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "friendships" },
         load,
       )
       .subscribe();
@@ -140,7 +154,30 @@ export function NotificationsView({ user }: { user: User }) {
     load();
   };
 
-  const total = invites.length + mentorReqs.length;
+  const acceptFriend = async (f: FriendshipRow) => {
+    const { error } = await supabase
+      .from("friendships")
+      .update({
+        status: "accepted",
+        user_id_b: user.id,
+        name_b: displayName(user),
+        avatar_b: avatarOf(user),
+      })
+      .eq("id", f.id);
+    if (error) {
+      showToast(error.message);
+      return;
+    }
+    showToast(`You are now friends with ${f.name_a ?? "them"}`);
+    load();
+  };
+
+  const declineFriend = async (f: FriendshipRow) => {
+    await supabase.from("friendships").update({ status: "declined" }).eq("id", f.id);
+    load();
+  };
+
+  const total = invites.length + mentorReqs.length + friendReqs.length;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6 sm:py-10">
@@ -192,6 +229,35 @@ export function NotificationsView({ user }: { user: User }) {
               </button>
               <button
                 onClick={() => declineInvite(inv)}
+                className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+              >
+                <X className="h-3.5 w-3.5" /> Decline
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {friendReqs.map((f) => (
+          <div key={f.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-primary">
+              <UserPlus className="h-3.5 w-3.5" /> Friend request
+            </div>
+            <p className="text-sm font-medium">
+              <b>{f.name_a ?? "Someone"}</b> wants to add you as a friend.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Friends only see each other's total points on the leaderboard — never
+              your actual tasks.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => acceptFriend(f)}
+                className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+              >
+                <Check className="h-3.5 w-3.5" /> Accept
+              </button>
+              <button
+                onClick={() => declineFriend(f)}
                 className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
               >
                 <X className="h-3.5 w-3.5" /> Decline
