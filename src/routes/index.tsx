@@ -7,6 +7,9 @@ import { AppShell, type AppView } from "@/components/AppShell";
 import { GroupsView } from "@/components/groups/GroupsView";
 import { NotificationsView } from "@/components/NotificationsView";
 import { MentorView } from "@/components/MentorView";
+import { FriendsView } from "@/components/FriendsView";
+import { useDateRangeFilter } from "@/components/DateRangeFilter";
+import { inRange } from "@/lib/dateRange";
 
 export const Route = createFileRoute("/")({
   head: () => ({
