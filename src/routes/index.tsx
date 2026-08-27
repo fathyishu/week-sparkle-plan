@@ -7,6 +7,9 @@ import { AppShell, type AppView } from "@/components/AppShell";
 import { GroupsView } from "@/components/groups/GroupsView";
 import { NotificationsView } from "@/components/NotificationsView";
 import { MentorView } from "@/components/MentorView";
+import { FriendsView } from "@/components/FriendsView";
+import { useDateRangeFilter } from "@/components/DateRangeFilter";
+import { inRange } from "@/lib/dateRange";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -41,6 +44,7 @@ function RouteRoot() {
 import type {
   AppState,
   BadgeType,
+  ConveyedTask,
   DayData,
   HistoryDay,
   Note,
@@ -574,6 +578,7 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
   });
 
   const [view, setView] = useState<AppView>("personal");
+  const historyFilter = useDateRangeFilter("lifetime");
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -591,6 +596,16 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
   }, [activeDay]);
 
   const day = state.days[activeDay - 1];
+
+  const filteredHistory = useMemo(
+    () =>
+      state.history.filter((h) =>
+        historyFilter.range.preset === "lifetime"
+          ? true
+          : inRange(h.endISO ?? h.startISO, historyFilter.range),
+      ),
+    [state.history, historyFilter.range],
+  );
 
   /* ---------- global stats ---------- */
   const globalStats = useMemo(() => {
@@ -816,6 +831,29 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
     setSelectMode(false);
   };
 
+  /** Manual "convey" — copies selected tasks to next week's day 1. */
+  const bulkConvey = () => {
+    setState((s) => {
+      const day = s.days[activeDay - 1];
+      const secs = new Map(sectionCatalog(s.days).map((x) => [x.id, x]));
+      const items: ConveyedTask[] = day.tasks
+        .filter((t) => selected.has(t.id))
+        .map((t) => ({
+          id: uid(),
+          title: t.title,
+          points: t.points,
+          sectionId: t.sectionId,
+          sectionLabel: secs.get(t.sectionId)?.label,
+          sectionColor: secs.get(t.sectionId)?.color,
+          isStreak: t.isStreak,
+          targetWeek: s.weekNumber + 1,
+          status: "pending" as TaskStatus,
+        }));
+      return { ...s, conveyed: [...(s.conveyed ?? []), ...items] };
+    });
+    setSelected(new Set());
+    setSelectMode(false);
+  };
 
   /* ---------- notes ---------- */
   const addNote = () => {
@@ -918,16 +956,54 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
         ptsPct: totalPtsAll ? Math.round((totalPts / totalPtsAll) * 100) : 0,
         tasksDone: totalDone,
         tasksTotal: totalTasks,
+        startISO: firstD.toISOString(),
+        endISO: lastD.toISOString(),
         days: snapshotDays(s.days),
       };
       const nextMonday = new Date(s.weekStartISO);
       nextMonday.setDate(nextMonday.getDate() + 7);
       const shifted = resetWeekToPending(shiftDays(s.days, 7));
+      const nextWeek = s.weekNumber + 1;
+      const days = materializeWeek(s, shifted);
+      // Manually conveyed tasks land on day 1 of their target week.
+      const due = (s.conveyed ?? []).filter((c) => c.targetWeek <= nextWeek);
+      if (due.length) {
+        let sections = days[0].sections;
+        for (const c of due) {
+          if (!sections.some((x) => x.id === c.sectionId)) {
+            sections = [
+              ...sections,
+              {
+                id: c.sectionId,
+                label: c.sectionLabel ?? c.sectionId,
+                color: c.sectionColor ?? "#6B7280",
+              },
+            ];
+          }
+        }
+        days[0] = {
+          ...days[0],
+          sections,
+          tasks: [
+            ...due.map((c) => ({
+              id: uid(),
+              title: c.title,
+              points: c.points,
+              status: "pending" as TaskStatus,
+              sectionId: c.sectionId,
+              isStreak: c.isStreak,
+              custom: true,
+            })),
+            ...days[0].tasks,
+          ],
+        };
+      }
       return {
         ...s,
         weekStartISO: nextMonday.toISOString(),
-        weekNumber: s.weekNumber + 1,
-        days: materializeWeek(s, shifted),
+        weekNumber: nextWeek,
+        days,
+        conveyed: (s.conveyed ?? []).filter((c) => c.targetWeek > nextWeek),
         history: [...s.history, snap],
       };
     });
@@ -1127,11 +1203,19 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
         {/* History */}
         {state.history.length > 0 && (
           <div className="mb-4 rounded-lg border border-purple-300/40 bg-purple-500/10 p-3">
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-300">
-              Weekly History
-            </h3>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-purple-700 dark:text-purple-300">
+                Weekly History
+              </h3>
+              {historyFilter.control}
+            </div>
             <ul className="space-y-1 text-sm">
-              {state.history.map((h) => (
+              {filteredHistory.length === 0 && (
+                <li className="text-xs text-muted-foreground">
+                  No weeks in this range.
+                </li>
+              )}
+              {filteredHistory.map((h) => (
                 <li key={h.week}>
                   <button
                     onClick={() => setHistoryOpen(h)}
@@ -1224,6 +1308,7 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
           onDeleteTask={deleteTask}
           onBulkCarry={bulkMoveCarry}
           onBulkDelete={bulkDelete}
+          onBulkConvey={bulkConvey}
           onAddNote={addNote}
           onNoteText={updateNoteText}
           onNoteDone={markNoteDone}
@@ -1287,6 +1372,8 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
         />
       ) : view === "notifications" ? (
         <NotificationsView user={user} />
+      ) : view === "friends" ? (
+        <FriendsView user={user} />
       ) : view === "mentors" ? (
         <MentorView user={user} signOut={signOut} />
       ) : (
@@ -1346,6 +1433,7 @@ interface DayPanelProps {
   onDeleteTask: (id: string) => void;
   onBulkCarry: () => void;
   onBulkDelete: () => void;
+  onBulkConvey: () => void;
   onAddNote: () => void;
   onNoteText: (id: string, text: string) => void;
   onNoteDone: (id: string) => void;
@@ -1374,6 +1462,7 @@ function DayPanel({
   onDeleteTask,
   onBulkCarry,
   onBulkDelete,
+  onBulkConvey,
   onAddNote,
   onNoteText,
   onNoteDone,
@@ -1550,6 +1639,12 @@ function DayPanel({
             className="rounded-md bg-amber-500 px-2.5 py-1 text-xs font-medium text-white hover:opacity-90"
           >
             ↻ Move to Next Day
+          </button>
+          <button
+            onClick={onBulkConvey}
+            className="rounded-md bg-[var(--stat-purple)] px-2.5 py-1 text-xs font-medium text-white hover:opacity-90"
+          >
+            ⏩ Convey to Next Week
           </button>
           <button
             onClick={onBulkDelete}
