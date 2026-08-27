@@ -44,6 +44,7 @@ function RouteRoot() {
 import type {
   AppState,
   BadgeType,
+  ConveyedTask,
   DayData,
   HistoryDay,
   Note,
