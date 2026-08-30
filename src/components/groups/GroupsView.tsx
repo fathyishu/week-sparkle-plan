@@ -524,7 +524,7 @@ function GroupDetail({
       )}
       {tab === "members" && <GroupMembers user={user} groupId={groupId} isOwner={isOwner} />}
       {tab === "sections" && <GroupSections groupId={groupId} isOwner={isOwner} />}
-      {tab === "leaderboard" && <GroupLeaderboard groupId={groupId} />}
+      {tab === "leaderboard" && <GroupLeaderboard user={user} groupId={groupId} />}
 
       {showInvite && (
         <InviteModal
@@ -546,6 +546,8 @@ function GroupDetail({
 
 /* ================================================================== */
 function GroupBoard({ user, groupId }: { user: User; groupId: string }) {
+  // Task-list date filter — independent instance from the leaderboard's.
+  const { range, control } = useDateRangeFilter("lifetime");
   const [addingIn, setAddingIn] = useState<TaskRow["status"] | null>(null);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
@@ -597,6 +599,8 @@ function GroupBoard({ user, groupId }: { user: User; groupId: string }) {
     { key: "done", label: "✅ Done" },
   ];
 
+  const visibleTasks = tasks.filter((t) => !t.due_date || inRange(t.due_date, range));
+
   const onDragEnd = async (e: DragEndEvent) => {
     const taskId = e.active.id as string;
     const overId = e.over?.id as string | undefined;
@@ -646,13 +650,17 @@ function GroupBoard({ user, groupId }: { user: User; groupId: string }) {
           {toast}
         </div>
       )}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-muted-foreground">Filter tasks by due date:</span>
+        {control}
+      </div>
       <div className="grid gap-3 md:grid-cols-3">
         {cols.map((c) => (
           <Column
             key={c.key}
             id={c.key}
             label={c.label}
-            tasks={tasks.filter((t) => t.status === c.key)}
+            tasks={visibleTasks.filter((t) => t.status === c.key)}
             members={members}
             onEdit={(t) => setEditing(t)}
             onAdd={() => setAddingIn(c.key)}
@@ -1182,18 +1190,26 @@ function GroupSections({ groupId, isOwner }: { groupId: string; isOwner: boolean
 }
 
 /* ================================================================== */
-function GroupLeaderboard({ groupId }: { groupId: string }) {
+function GroupLeaderboard({ user, groupId }: { user: User; groupId: string }) {
   const { range, control } = useDateRangeFilter("week");
   const [points, setPoints] = useState<WeeklyPoints[]>([]);
+  const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
 
   const load = useCallback(async () => {
-    const [{ data: pts }, { data: mem }] = await Promise.all([
+    const [{ data: pts }, { data: mem }, { data: tk }] = await Promise.all([
       supabase.from("group_weekly_points").select("*").eq("group_id", groupId),
       supabase.from("group_members").select("*").eq("group_id", groupId),
+      supabase
+        .from("group_tasks")
+        .select("*")
+        .eq("group_id", groupId)
+        .eq("deleted", false)
+        .eq("status", "done"),
     ]);
     setPoints((pts ?? []) as WeeklyPoints[]);
     setMembers((mem ?? []) as MemberRow[]);
+    setTasks((tk ?? []) as TaskRow[]);
   }, [groupId]);
 
   // Live updates — filter state lives outside this effect, so a realtime
@@ -1222,6 +1238,16 @@ function GroupLeaderboard({ groupId }: { groupId: string }) {
         },
         () => load(),
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "group_members",
+          filter: `group_id=eq.${groupId}`,
+        },
+        () => load(),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
@@ -1229,23 +1255,40 @@ function GroupLeaderboard({ groupId }: { groupId: string }) {
   }, [groupId, load]);
 
   const rows = useMemo(() => {
+    // Every group member appears, even with zero points.
     const agg = new Map<string, { points: number; tasks_done: number }>();
+    for (const m of members) agg.set(m.user_id, { points: 0, tasks_done: 0 });
+
+    // Completed group tasks (authoritative, visible to every member via RLS).
+    const counted = new Set<string>();
+    for (const t of tasks) {
+      if (!t.assigned_to) continue;
+      if (t.due_date && !inRange(t.due_date, range)) continue;
+      const cur = agg.get(t.assigned_to) ?? { points: 0, tasks_done: 0 };
+      cur.points += t.pts;
+      cur.tasks_done += 1;
+      agg.set(t.assigned_to, cur);
+      counted.add(t.assigned_to);
+    }
+    // Fallback for members whose points only exist as weekly snapshots.
     for (const p of points) {
-      // shared date-range filter (week / month / lifetime / custom)
+      if (counted.has(p.user_id)) continue;
       if (!inRange(p.week_start, range)) continue;
       const cur = agg.get(p.user_id) ?? { points: 0, tasks_done: 0 };
       cur.points += p.points;
       cur.tasks_done += p.tasks_done;
       agg.set(p.user_id, cur);
     }
+
     return [...agg.entries()]
       .map(([user_id, v]) => ({
         user_id,
         ...v,
+        isMe: user_id === user.id,
         member: members.find((m) => m.user_id === user_id),
       }))
       .sort((a, b) => b.points - a.points);
-  }, [points, members, range]);
+  }, [points, tasks, members, range, user.id]);
 
   return (
     <div className="space-y-3">
@@ -1259,7 +1302,9 @@ function GroupLeaderboard({ groupId }: { groupId: string }) {
           rows.map((r, i) => (
             <div
               key={r.user_id}
-              className="flex items-center gap-3 border-b border-border p-3 last:border-b-0"
+              className={`flex items-center gap-3 border-b border-border p-3 last:border-b-0 ${
+                r.isMe ? "bg-primary/10" : ""
+              }`}
             >
               <span className="w-6 text-center text-sm font-bold text-muted-foreground">
                 {i + 1}
@@ -1271,6 +1316,7 @@ function GroupLeaderboard({ groupId }: { groupId: string }) {
               )}
               <div className="flex-1 text-sm font-medium">
                 {r.member?.display_name ?? r.user_id.slice(0, 8)}
+                {r.isMe && <span className="ml-1 text-xs text-primary">(you)</span>}
               </div>
               <div className="text-right">
                 <div className="text-sm font-semibold">{r.points} pts</div>
@@ -1464,7 +1510,9 @@ function AddTaskModal({
 
 /* ================================================================== */
 function GroupIndividual({ user, groupId }: { user: User; groupId: string }) {
-  const [tasks, setTasks] = useState<TaskRow[]>([]);
+  // Task-list date filter — independent instance from the leaderboard's.
+  const { range, control } = useDateRangeFilter("lifetime");
+  const [allTasks, setAllTasks] = useState<TaskRow[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [editing, setEditing] = useState<TaskRow | null>(null);
 
@@ -1473,7 +1521,7 @@ function GroupIndividual({ user, groupId }: { user: User; groupId: string }) {
       supabase.from("group_tasks").select("*").eq("group_id", groupId).eq("deleted", false),
       supabase.from("group_members").select("*").eq("group_id", groupId),
     ]);
-    setTasks((tk ?? []) as TaskRow[]);
+    setAllTasks((tk ?? []) as TaskRow[]);
     setMembers((mem ?? []) as MemberRow[]);
   };
 
@@ -1493,10 +1541,12 @@ function GroupIndividual({ user, groupId }: { user: User; groupId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
 
+  const tasks = allTasks.filter((t) => !t.due_date || inRange(t.due_date, range));
+
   const cycle = async (t: TaskRow) => {
     const next: TaskRow["status"] =
       t.status === "todo" ? "inprogress" : t.status === "inprogress" ? "done" : "todo";
-    setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: next } : x)));
+    setAllTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: next } : x)));
     await supabase.from("group_tasks").update({ status: next }).eq("id", t.id);
   };
 
@@ -1518,6 +1568,10 @@ function GroupIndividual({ user, groupId }: { user: User; groupId: string }) {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-muted-foreground">Filter tasks by due date:</span>
+        {control}
+      </div>
       <div className="flex items-center justify-between rounded-lg border border-border bg-card p-3 text-sm">
         <span className="text-muted-foreground">
           {tasks.length} task{tasks.length === 1 ? "" : "s"} ·{" "}
