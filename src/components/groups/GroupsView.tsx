@@ -1182,18 +1182,26 @@ function GroupSections({ groupId, isOwner }: { groupId: string; isOwner: boolean
 }
 
 /* ================================================================== */
-function GroupLeaderboard({ groupId }: { groupId: string }) {
+function GroupLeaderboard({ user, groupId }: { user: User; groupId: string }) {
   const { range, control } = useDateRangeFilter("week");
   const [points, setPoints] = useState<WeeklyPoints[]>([]);
+  const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
 
   const load = useCallback(async () => {
-    const [{ data: pts }, { data: mem }] = await Promise.all([
+    const [{ data: pts }, { data: mem }, { data: tk }] = await Promise.all([
       supabase.from("group_weekly_points").select("*").eq("group_id", groupId),
       supabase.from("group_members").select("*").eq("group_id", groupId),
+      supabase
+        .from("group_tasks")
+        .select("*")
+        .eq("group_id", groupId)
+        .eq("deleted", false)
+        .eq("status", "done"),
     ]);
     setPoints((pts ?? []) as WeeklyPoints[]);
     setMembers((mem ?? []) as MemberRow[]);
+    setTasks((tk ?? []) as TaskRow[]);
   }, [groupId]);
 
   // Live updates — filter state lives outside this effect, so a realtime
@@ -1222,6 +1230,16 @@ function GroupLeaderboard({ groupId }: { groupId: string }) {
         },
         () => load(),
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "group_members",
+          filter: `group_id=eq.${groupId}`,
+        },
+        () => load(),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
@@ -1229,23 +1247,40 @@ function GroupLeaderboard({ groupId }: { groupId: string }) {
   }, [groupId, load]);
 
   const rows = useMemo(() => {
+    // Every group member appears, even with zero points.
     const agg = new Map<string, { points: number; tasks_done: number }>();
+    for (const m of members) agg.set(m.user_id, { points: 0, tasks_done: 0 });
+
+    // Completed group tasks (authoritative, visible to every member via RLS).
+    const counted = new Set<string>();
+    for (const t of tasks) {
+      if (!t.assigned_to) continue;
+      if (!inRange(t.due_date ?? t.updated_at ?? t.created_at, range)) continue;
+      const cur = agg.get(t.assigned_to) ?? { points: 0, tasks_done: 0 };
+      cur.points += t.pts;
+      cur.tasks_done += 1;
+      agg.set(t.assigned_to, cur);
+      counted.add(t.assigned_to);
+    }
+    // Fallback for members whose points only exist as weekly snapshots.
     for (const p of points) {
-      // shared date-range filter (week / month / lifetime / custom)
+      if (counted.has(p.user_id)) continue;
       if (!inRange(p.week_start, range)) continue;
       const cur = agg.get(p.user_id) ?? { points: 0, tasks_done: 0 };
       cur.points += p.points;
       cur.tasks_done += p.tasks_done;
       agg.set(p.user_id, cur);
     }
+
     return [...agg.entries()]
       .map(([user_id, v]) => ({
         user_id,
         ...v,
+        isMe: user_id === user.id,
         member: members.find((m) => m.user_id === user_id),
       }))
       .sort((a, b) => b.points - a.points);
-  }, [points, members, range]);
+  }, [points, tasks, members, range, user.id]);
 
   return (
     <div className="space-y-3">
