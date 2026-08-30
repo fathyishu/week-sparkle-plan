@@ -524,7 +524,7 @@ function GroupDetail({
       )}
       {tab === "members" && <GroupMembers user={user} groupId={groupId} isOwner={isOwner} />}
       {tab === "sections" && <GroupSections groupId={groupId} isOwner={isOwner} />}
-      {tab === "leaderboard" && <GroupLeaderboard groupId={groupId} />}
+      {tab === "leaderboard" && <GroupLeaderboard user={user} groupId={groupId} />}
 
       {showInvite && (
         <InviteModal
@@ -1255,7 +1255,7 @@ function GroupLeaderboard({ user, groupId }: { user: User; groupId: string }) {
     const counted = new Set<string>();
     for (const t of tasks) {
       if (!t.assigned_to) continue;
-      if (!inRange(t.due_date ?? t.updated_at ?? t.created_at, range)) continue;
+      if (!inRange(t.due_date, range)) continue;
       const cur = agg.get(t.assigned_to) ?? { points: 0, tasks_done: 0 };
       cur.points += t.pts;
       cur.tasks_done += 1;
@@ -1294,7 +1294,9 @@ function GroupLeaderboard({ user, groupId }: { user: User; groupId: string }) {
           rows.map((r, i) => (
             <div
               key={r.user_id}
-              className="flex items-center gap-3 border-b border-border p-3 last:border-b-0"
+              className={`flex items-center gap-3 border-b border-border p-3 last:border-b-0 ${
+                r.isMe ? "bg-primary/10" : ""
+              }`}
             >
               <span className="w-6 text-center text-sm font-bold text-muted-foreground">
                 {i + 1}
@@ -1306,6 +1308,7 @@ function GroupLeaderboard({ user, groupId }: { user: User; groupId: string }) {
               )}
               <div className="flex-1 text-sm font-medium">
                 {r.member?.display_name ?? r.user_id.slice(0, 8)}
+                {r.isMe && <span className="ml-1 text-xs text-primary">(you)</span>}
               </div>
               <div className="text-right">
                 <div className="text-sm font-semibold">{r.points} pts</div>
