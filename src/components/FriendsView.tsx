@@ -186,8 +186,15 @@ export function FriendsView({ user }: { user: User }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "friendships" }, () =>
         load(),
       )
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_app_state" }, () =>
+        load(),
+      )
       .subscribe();
+    // Friends' task rows aren't readable directly (points come from the
+    // security-definer aggregate), so refresh periodically to stay live.
+    const timer = setInterval(load, 20000);
     return () => {
+      clearInterval(timer);
       supabase.removeChannel(ch);
     };
   }, [load, user.id]);
