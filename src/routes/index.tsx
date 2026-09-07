@@ -1337,6 +1337,38 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
           <HistoryDetail week={historyOpen} onClose={() => setHistoryOpen(null)} />
         )}
 
+        {/* Jump to any week — pure navigation, never rewrites past weeks */}
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-2">
+          <span className="text-xs font-medium">📅 Jump to date</span>
+          <input
+            type="date"
+            value={jumpDate}
+            onChange={(e) => setJumpDate(e.target.value)}
+            className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+          />
+          <button
+            onClick={() => jumpToWeek(jumpDate)}
+            disabled={!jumpDate}
+            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+          >
+            Go to that week
+          </button>
+          <button
+            onClick={() => {
+              const t = new Date();
+              const v = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+              setJumpDate(v);
+              jumpToWeek(v);
+            }}
+            className="rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium transition hover:bg-accent"
+          >
+            Today
+          </button>
+          <span className="text-[11px] text-muted-foreground">
+            Past weeks open read-only; future weeks move the board.
+          </span>
+        </div>
+
         {/* Rollover */}
         <div className="mb-6 flex flex-wrap gap-2">
           <button
