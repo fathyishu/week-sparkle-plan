@@ -1583,6 +1583,8 @@ interface DayPanelProps {
     isStreak?: boolean;
   }) => void;
   streaks: Record<string, StreakInfo>;
+  /** Renders the exact same board with every interaction disabled. */
+  readOnly?: boolean;
 }
 
 function DayPanel({
