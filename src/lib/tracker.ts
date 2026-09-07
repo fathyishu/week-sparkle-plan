@@ -136,19 +136,24 @@ export function snapshotDays(days: DayData[]): HistoryDay[] {
 
 /* ---------------- streaks ---------------- */
 
+/** Whole days between two yyyy-mm-dd keys (b - a). */
+function dayDiff(aKey: string, bKey: string): number {
+  const a = Date.parse(`${aKey}T00:00:00Z`);
+  const b = Date.parse(`${bKey}T00:00:00Z`);
+  return Math.round((b - a) / 86400000);
+}
+
 export function bumpStreak(
   prev: { count: number; lastDoneDate?: string } | undefined,
   dateISO: string,
 ): { count: number; lastDoneDate: string } {
   const today = dayKey(dateISO);
   if (!prev?.lastDoneDate) return { count: 1, lastDoneDate: today };
-  if (prev.lastDoneDate === today) return { count: prev.count, lastDoneDate: today };
-  const yesterday = new Date(dateISO);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yKey = yesterday.toISOString().slice(0, 10);
-  return prev.lastDoneDate === yKey
-    ? { count: prev.count + 1, lastDoneDate: today }
-    : { count: 1, lastDoneDate: today };
+  const gap = dayDiff(prev.lastDoneDate, today);
+  if (gap === 0) return { count: Math.max(1, prev.count), lastDoneDate: today };
+  // Exactly one calendar day later continues the chain; any missed day resets it.
+  if (gap === 1) return { count: prev.count + 1, lastDoneDate: today };
+  return { count: 1, lastDoneDate: today };
 }
 
 export function dropStreak(
@@ -157,9 +162,30 @@ export function dropStreak(
 ): { count: number; lastDoneDate?: string } {
   const today = dayKey(dateISO);
   if (prev?.lastDoneDate === today) {
-    return { count: Math.max(0, prev.count - 1), lastDoneDate: undefined };
+    const count = Math.max(0, prev.count - 1);
+    // Step the anchor back one day so re-checking tomorrow still continues the chain.
+    const prevDay = new Date(Date.parse(`${today}T00:00:00Z`) - 86400000)
+      .toISOString()
+      .slice(0, 10);
+    return count > 0
+      ? { count, lastDoneDate: prevDay }
+      : { count: 0, lastDoneDate: undefined };
   }
   return prev ?? { count: 0 };
+}
+
+/**
+ * The streak as of `nowISO`. A chain is only alive if it was completed today or
+ * yesterday — otherwise a day was missed and the streak is 0.
+ */
+export function currentStreak(
+  info: { count: number; lastDoneDate?: string } | undefined,
+  nowISO: string = new Date().toISOString(),
+): number {
+  if (!info?.lastDoneDate || info.count <= 0) return 0;
+  const gap = dayDiff(info.lastDoneDate, dayKey(nowISO));
+  if (gap < 0) return info.count; // completed on a future-dated day cell
+  return gap <= 1 ? info.count : 0;
 }
 
 /* ---------------- CSV ---------------- */
