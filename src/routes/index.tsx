@@ -1606,6 +1606,7 @@ function DayPanel({
   onNoteDelete,
   onAddTask,
   streaks,
+  readOnly = false,
 }: DayPanelProps) {
   const doneCount = day.tasks.filter((t) => t.status === "done").length;
   const totalCount = day.tasks.length;
