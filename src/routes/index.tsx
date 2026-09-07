@@ -1848,15 +1848,18 @@ function DayPanel({
       </div>
 
       {/* Notepad */}
+      {!(readOnly && day.notes.length === 0) && (
       <div className="mt-6 rounded-lg border border-border bg-secondary/50 p-3">
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-sm font-semibold">Notepad</h3>
+          {!readOnly && (
           <button
             onClick={onAddNote}
             className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent"
           >
             + Add note
           </button>
+          )}
         </div>
         {day.notes.length === 0 && (
           <p className="text-xs text-muted-foreground">No notes yet.</p>
@@ -1877,42 +1880,54 @@ function DayPanel({
               <input
                 type="text"
                 value={n.text}
+                readOnly={readOnly}
                 onChange={(e) => onNoteText(n.id, e.target.value)}
                 placeholder="Type a note..."
                 className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${
                   n.status === "done" ? "line-through" : ""
                 }`}
               />
-              <button
-                onClick={() => onNoteDone(n.id)}
-                className={`rounded-md px-2 py-1 text-xs font-medium ${
-                  n.status === "done"
-                    ? "bg-[var(--stat-green)] text-white"
-                    : "border border-input hover:bg-accent"
-                }`}
-              >
-                ✓ Done
-              </button>
-              <button
-                onClick={() => onNoteCarry(n.id)}
-                className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent"
-              >
-                ↻ Carry
-              </button>
-              <button
-                onClick={() => onNoteDelete(n.id)}
-                className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent"
-                aria-label="Delete note"
-              >
-                🗑
-              </button>
+              {readOnly ? (
+                n.status === "done" && (
+                  <span className="rounded-md bg-[var(--stat-green)] px-2 py-1 text-xs font-medium text-white">
+                    ✓ Done
+                  </span>
+                )
+              ) : (
+                <>
+                  <button
+                    onClick={() => onNoteDone(n.id)}
+                    className={`rounded-md px-2 py-1 text-xs font-medium ${
+                      n.status === "done"
+                        ? "bg-[var(--stat-green)] text-white"
+                        : "border border-input hover:bg-accent"
+                    }`}
+                  >
+                    ✓ Done
+                  </button>
+                  <button
+                    onClick={() => onNoteCarry(n.id)}
+                    className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent"
+                  >
+                    ↻ Carry
+                  </button>
+                  <button
+                    onClick={() => onNoteDelete(n.id)}
+                    className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent"
+                    aria-label="Delete note"
+                  >
+                    🗑
+                  </button>
+                </>
+              )}
             </div>
           ))}
         </div>
       </div>
+      )}
 
       {/* Add task */}
-      <AddTaskForm sections={day.sections} onAdd={onAddTask} />
+      {!readOnly && <AddTaskForm sections={day.sections} onAdd={onAddTask} />}
     </div>
   );
 }
