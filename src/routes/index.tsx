@@ -1662,15 +1662,21 @@ function DayPanel({
             </span>
           </div>
         </div>
-        <button
-          onClick={() => {
-            setSelectMode(!selectMode);
-            if (selectMode) setSelected(new Set());
-          }}
-          className="rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium transition hover:bg-accent"
-        >
-          ☑ {selectMode ? "Cancel select" : "Select Tasks"}
-        </button>
+        {readOnly ? (
+          <span className="rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-medium text-muted-foreground">
+            🔒 Read-only
+          </span>
+        ) : (
+          <button
+            onClick={() => {
+              setSelectMode(!selectMode);
+              if (selectMode) setSelected(new Set());
+            }}
+            className="rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium transition hover:bg-accent"
+          >
+            ☑ {selectMode ? "Cancel select" : "Select Tasks"}
+          </button>
+        )}
       </div>
 
       {/* Progress bars */}
