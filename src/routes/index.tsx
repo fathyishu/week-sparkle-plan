@@ -1025,6 +1025,93 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
     setActiveDay(1);
   };
 
+  /* ---------- jump straight to any week (pure navigation) ---------- */
+  const localKey = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate(),
+    ).padStart(2, "0")}`;
+  const mondayOf = (d: Date) => {
+    const c = new Date(d);
+    c.setHours(0, 0, 0, 0);
+    c.setDate(c.getDate() - ((c.getDay() + 6) % 7));
+    return c;
+  };
+  const daysBetween = (a: string, b: string) =>
+    Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000);
+
+  const snapshotWeek = (s: AppState): WeekHistory => {
+    let done = 0,
+      total = 0,
+      pts = 0,
+      allPts = 0;
+    for (const d of s.days)
+      for (const t of d.tasks) {
+        total += 1;
+        allPts += t.points;
+        if (t.status === "done") {
+          done += 1;
+          pts += t.points;
+        }
+      }
+    const first = new Date(s.days[0].isoDate);
+    const last = new Date(s.days[6].isoDate);
+    return {
+      week: s.weekNumber,
+      range: `${fmtDate(first)} – ${fmtDate(last)}`,
+      taskPct: total ? Math.round((done / total) * 100) : 0,
+      ptsPct: allPts ? Math.round((pts / allPts) * 100) : 0,
+      tasksDone: done,
+      tasksTotal: total,
+      startISO: first.toISOString(),
+      endISO: last.toISOString(),
+      days: snapshotDays(s.days),
+    };
+  };
+
+  const [jumpDate, setJumpDate] = useState("");
+
+  const jumpToWeek = (value: string) => {
+    if (!value) return;
+    const picked = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(picked.getTime())) return;
+    const targetKey = localKey(mondayOf(picked));
+    const dayIdx = Math.max(0, Math.min(6, daysBetween(targetKey, value)));
+    const currentKey = localKey(mondayOf(new Date(state.days[0].isoDate)));
+
+    if (targetKey === currentKey) {
+      setActiveDay(dayIdx + 1);
+      return;
+    }
+    // A past week that was already archived opens as the read-only board.
+    const hist = state.history.find(
+      (h) => h.startISO && localKey(mondayOf(new Date(h.startISO))) === targetKey,
+    );
+    if (hist) {
+      setHistoryOpen(hist);
+      return;
+    }
+    // Otherwise move the live board straight to that week.
+    setState((s) => {
+      const curKey = localKey(mondayOf(new Date(s.days[0].isoDate)));
+      const delta = daysBetween(curKey, targetKey);
+      if (delta === 0) return s;
+      const shifted = resetWeekToPending(shiftDays(s.days, delta));
+      const weekNumber = Math.max(1, s.weekNumber + Math.round(delta / 7));
+      const next: AppState = {
+        ...s,
+        weekStartISO: new Date(`${targetKey}T00:00:00`).toISOString(),
+        weekNumber,
+        days: shifted,
+        // Forward jumps archive the week you are leaving so nothing is lost.
+        history: delta > 0 ? [...s.history, snapshotWeek(s)] : s.history,
+      };
+      return { ...next, days: materializeWeek(next, shifted) };
+    });
+    setActiveDay(dayIdx + 1);
+  };
+
+
+
   const resetAll = () => {
     if (confirm("Uncheck every task for this week? Your tasks and history are kept.")) {
       setState((s) => ({ ...s, days: materializeWeek(s, resetWeekToPending(s.days)) }));
