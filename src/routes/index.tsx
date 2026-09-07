@@ -1764,6 +1764,7 @@ function DayPanel({
                 onToggleSelect={() => toggleSelect(t.id)}
                 onCycle={() => onCycleTask(t.id)}
                 onDelete={() => onDeleteTask(t.id)}
+                readOnly={readOnly}
               />
             ))}
 
