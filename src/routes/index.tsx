@@ -598,6 +598,20 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
 
   const day = state.days[activeDay - 1];
 
+  /**
+   * Streak counts as of *today's* calendar date: a chain whose last completion
+   * is older than yesterday is a miss and shows 0, even if nothing was clicked.
+   */
+  const effectiveStreaks = useMemo(() => {
+    const now = new Date().toISOString();
+    const out: Record<string, StreakInfo> = {};
+    for (const [k, v] of Object.entries(state.streaks ?? {})) {
+      out[k] = { ...v, count: currentStreak(v, now) };
+    }
+    return out;
+  }, [state.streaks]);
+
+
   const filteredHistory = useMemo(
     () =>
       state.history.filter((h) =>
