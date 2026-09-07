@@ -57,6 +57,7 @@ import type {
 } from "@/lib/types";
 import {
   bumpStreak,
+  currentStreak,
   defsToCsv,
   dropStreak,
   fmtDate,
@@ -597,6 +598,20 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
 
   const day = state.days[activeDay - 1];
 
+  /**
+   * Streak counts as of *today's* calendar date: a chain whose last completion
+   * is older than yesterday is a miss and shows 0, even if nothing was clicked.
+   */
+  const effectiveStreaks = useMemo(() => {
+    const now = new Date().toISOString();
+    const out: Record<string, StreakInfo> = {};
+    for (const [k, v] of Object.entries(state.streaks ?? {})) {
+      out[k] = { ...v, count: currentStreak(v, now) };
+    }
+    return out;
+  }, [state.streaks]);
+
+
   const filteredHistory = useMemo(
     () =>
       state.history.filter((h) =>
@@ -1010,6 +1025,93 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
     setActiveDay(1);
   };
 
+  /* ---------- jump straight to any week (pure navigation) ---------- */
+  const localKey = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate(),
+    ).padStart(2, "0")}`;
+  const mondayOf = (d: Date) => {
+    const c = new Date(d);
+    c.setHours(0, 0, 0, 0);
+    c.setDate(c.getDate() - ((c.getDay() + 6) % 7));
+    return c;
+  };
+  const daysBetween = (a: string, b: string) =>
+    Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000);
+
+  const snapshotWeek = (s: AppState): WeekHistory => {
+    let done = 0,
+      total = 0,
+      pts = 0,
+      allPts = 0;
+    for (const d of s.days)
+      for (const t of d.tasks) {
+        total += 1;
+        allPts += t.points;
+        if (t.status === "done") {
+          done += 1;
+          pts += t.points;
+        }
+      }
+    const first = new Date(s.days[0].isoDate);
+    const last = new Date(s.days[6].isoDate);
+    return {
+      week: s.weekNumber,
+      range: `${fmtDate(first)} – ${fmtDate(last)}`,
+      taskPct: total ? Math.round((done / total) * 100) : 0,
+      ptsPct: allPts ? Math.round((pts / allPts) * 100) : 0,
+      tasksDone: done,
+      tasksTotal: total,
+      startISO: first.toISOString(),
+      endISO: last.toISOString(),
+      days: snapshotDays(s.days),
+    };
+  };
+
+  const [jumpDate, setJumpDate] = useState("");
+
+  const jumpToWeek = (value: string) => {
+    if (!value) return;
+    const picked = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(picked.getTime())) return;
+    const targetKey = localKey(mondayOf(picked));
+    const dayIdx = Math.max(0, Math.min(6, daysBetween(targetKey, value)));
+    const currentKey = localKey(mondayOf(new Date(state.days[0].isoDate)));
+
+    if (targetKey === currentKey) {
+      setActiveDay(dayIdx + 1);
+      return;
+    }
+    // A past week that was already archived opens as the read-only board.
+    const hist = state.history.find(
+      (h) => h.startISO && localKey(mondayOf(new Date(h.startISO))) === targetKey,
+    );
+    if (hist) {
+      setHistoryOpen(hist);
+      return;
+    }
+    // Otherwise move the live board straight to that week.
+    setState((s) => {
+      const curKey = localKey(mondayOf(new Date(s.days[0].isoDate)));
+      const delta = daysBetween(curKey, targetKey);
+      if (delta === 0) return s;
+      const shifted = resetWeekToPending(shiftDays(s.days, delta));
+      const weekNumber = Math.max(1, s.weekNumber + Math.round(delta / 7));
+      const next: AppState = {
+        ...s,
+        weekStartISO: new Date(`${targetKey}T00:00:00`).toISOString(),
+        weekNumber,
+        days: shifted,
+        // Forward jumps archive the week you are leaving so nothing is lost.
+        history: delta > 0 ? [...s.history, snapshotWeek(s)] : s.history,
+      };
+      return { ...next, days: materializeWeek(next, shifted) };
+    });
+    setActiveDay(dayIdx + 1);
+  };
+
+
+
   const resetAll = () => {
     if (confirm("Uncheck every task for this week? Your tasks and history are kept.")) {
       setState((s) => ({ ...s, days: materializeWeek(s, resetWeekToPending(s.days)) }));
@@ -1235,6 +1337,38 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
           <HistoryDetail week={historyOpen} onClose={() => setHistoryOpen(null)} />
         )}
 
+        {/* Jump to any week — pure navigation, never rewrites past weeks */}
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-2">
+          <span className="text-xs font-medium">📅 Jump to date</span>
+          <input
+            type="date"
+            value={jumpDate}
+            onChange={(e) => setJumpDate(e.target.value)}
+            className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+          />
+          <button
+            onClick={() => jumpToWeek(jumpDate)}
+            disabled={!jumpDate}
+            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+          >
+            Go to that week
+          </button>
+          <button
+            onClick={() => {
+              const t = new Date();
+              const v = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+              setJumpDate(v);
+              jumpToWeek(v);
+            }}
+            className="rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium transition hover:bg-accent"
+          >
+            Today
+          </button>
+          <span className="text-[11px] text-muted-foreground">
+            Past weeks open read-only; future weeks move the board.
+          </span>
+        </div>
+
         {/* Rollover */}
         <div className="mb-6 flex flex-wrap gap-2">
           <button
@@ -1315,7 +1449,7 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
           onNoteCarry={carryNote}
           onNoteDelete={deleteNote}
           onAddTask={addTask}
-          streaks={state.streaks ?? {}}
+          streaks={effectiveStreaks}
         />
 
         {/* Mini overview */}
@@ -1449,6 +1583,8 @@ interface DayPanelProps {
     isStreak?: boolean;
   }) => void;
   streaks: Record<string, StreakInfo>;
+  /** Renders the exact same board with every interaction disabled. */
+  readOnly?: boolean;
 }
 
 function DayPanel({
@@ -1470,6 +1606,7 @@ function DayPanel({
   onNoteDelete,
   onAddTask,
   streaks,
+  readOnly = false,
 }: DayPanelProps) {
   const doneCount = day.tasks.filter((t) => t.status === "done").length;
   const totalCount = day.tasks.length;
@@ -1525,15 +1662,21 @@ function DayPanel({
             </span>
           </div>
         </div>
-        <button
-          onClick={() => {
-            setSelectMode(!selectMode);
-            if (selectMode) setSelected(new Set());
-          }}
-          className="rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium transition hover:bg-accent"
-        >
-          ☑ {selectMode ? "Cancel select" : "Select Tasks"}
-        </button>
+        {readOnly ? (
+          <span className="rounded-md border border-border bg-secondary px-3 py-1.5 text-xs font-medium text-muted-foreground">
+            🔒 Read-only
+          </span>
+        ) : (
+          <button
+            onClick={() => {
+              setSelectMode(!selectMode);
+              if (selectMode) setSelected(new Set());
+            }}
+            className="rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium transition hover:bg-accent"
+          >
+            ☑ {selectMode ? "Cancel select" : "Select Tasks"}
+          </button>
+        )}
       </div>
 
       {/* Progress bars */}
@@ -1621,6 +1764,7 @@ function DayPanel({
                 onToggleSelect={() => toggleSelect(t.id)}
                 onCycle={() => onCycleTask(t.id)}
                 onDelete={() => onDeleteTask(t.id)}
+                readOnly={readOnly}
               />
             ))}
 
@@ -1694,6 +1838,7 @@ function DayPanel({
                   onToggleSelect={() => toggleSelect(t.id)}
                   onCycle={() => onCycleTask(t.id)}
                   onDelete={() => onDeleteTask(t.id)}
+                  readOnly={readOnly}
                 />
               ))}
 
@@ -1703,15 +1848,18 @@ function DayPanel({
       </div>
 
       {/* Notepad */}
+      {!(readOnly && day.notes.length === 0) && (
       <div className="mt-6 rounded-lg border border-border bg-secondary/50 p-3">
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-sm font-semibold">Notepad</h3>
+          {!readOnly && (
           <button
             onClick={onAddNote}
             className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent"
           >
             + Add note
           </button>
+          )}
         </div>
         {day.notes.length === 0 && (
           <p className="text-xs text-muted-foreground">No notes yet.</p>
@@ -1732,42 +1880,54 @@ function DayPanel({
               <input
                 type="text"
                 value={n.text}
+                readOnly={readOnly}
                 onChange={(e) => onNoteText(n.id, e.target.value)}
                 placeholder="Type a note..."
                 className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${
                   n.status === "done" ? "line-through" : ""
                 }`}
               />
-              <button
-                onClick={() => onNoteDone(n.id)}
-                className={`rounded-md px-2 py-1 text-xs font-medium ${
-                  n.status === "done"
-                    ? "bg-[var(--stat-green)] text-white"
-                    : "border border-input hover:bg-accent"
-                }`}
-              >
-                ✓ Done
-              </button>
-              <button
-                onClick={() => onNoteCarry(n.id)}
-                className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent"
-              >
-                ↻ Carry
-              </button>
-              <button
-                onClick={() => onNoteDelete(n.id)}
-                className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent"
-                aria-label="Delete note"
-              >
-                🗑
-              </button>
+              {readOnly ? (
+                n.status === "done" && (
+                  <span className="rounded-md bg-[var(--stat-green)] px-2 py-1 text-xs font-medium text-white">
+                    ✓ Done
+                  </span>
+                )
+              ) : (
+                <>
+                  <button
+                    onClick={() => onNoteDone(n.id)}
+                    className={`rounded-md px-2 py-1 text-xs font-medium ${
+                      n.status === "done"
+                        ? "bg-[var(--stat-green)] text-white"
+                        : "border border-input hover:bg-accent"
+                    }`}
+                  >
+                    ✓ Done
+                  </button>
+                  <button
+                    onClick={() => onNoteCarry(n.id)}
+                    className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent"
+                  >
+                    ↻ Carry
+                  </button>
+                  <button
+                    onClick={() => onNoteDelete(n.id)}
+                    className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent"
+                    aria-label="Delete note"
+                  >
+                    🗑
+                  </button>
+                </>
+              )}
             </div>
           ))}
         </div>
       </div>
+      )}
 
       {/* Add task */}
-      <AddTaskForm sections={day.sections} onAdd={onAddTask} />
+      {!readOnly && <AddTaskForm sections={day.sections} onAdd={onAddTask} />}
     </div>
   );
 }
