@@ -57,6 +57,7 @@ import type {
 } from "@/lib/types";
 import {
   bumpStreak,
+  currentStreak,
   defsToCsv,
   dropStreak,
   fmtDate,
