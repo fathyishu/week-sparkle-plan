@@ -2033,13 +2033,15 @@ function TaskRow({
       <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${ptsBg}`}>
         {task.points}pt
       </span>
-      <button
-        onClick={onDelete}
-        aria-label="Delete task"
-        className="rounded-md p-1 text-muted-foreground transition hover:bg-accent hover:text-foreground"
-      >
-        🗑
-      </button>
+      {!readOnly && (
+        <button
+          onClick={onDelete}
+          aria-label="Delete task"
+          className="rounded-md p-1 text-muted-foreground transition hover:bg-accent hover:text-foreground"
+        >
+          🗑
+        </button>
+      )}
     </div>
   );
 }
