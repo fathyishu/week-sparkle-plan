@@ -1974,7 +1974,7 @@ function TaskRow({
         isUrgent ? "border-red-500/60 shadow-[0_0_0_1px_rgba(239,68,68,0.35)]" : "border-border"
       }`}
     >
-      {selectMode && (
+      {selectMode && !readOnly && (
         <input
           type="checkbox"
           checked={selected}
@@ -1983,14 +1983,15 @@ function TaskRow({
         />
       )}
       <button
-        onClick={onCycle}
+        onClick={readOnly ? undefined : onCycle}
+        disabled={readOnly}
         className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-xs transition ${
           isDone
             ? "border-transparent bg-[var(--stat-green)] text-white"
             : isCarry
               ? "border-transparent bg-orange-500 text-white"
               : "border-input bg-background"
-        }`}
+        } ${readOnly ? "cursor-default" : ""}`}
         aria-label="Cycle task status"
       >
         {isDone ? "✓" : isCarry ? "↻" : ""}
