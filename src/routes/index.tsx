@@ -1944,6 +1944,7 @@ function TaskRow({
   onToggleSelect,
   onCycle,
   onDelete,
+  readOnly = false,
 }: {
   task: Task;
   streak?: number;
@@ -1952,6 +1953,7 @@ function TaskRow({
   onToggleSelect: () => void;
   onCycle: () => void;
   onDelete: () => void;
+  readOnly?: boolean;
 }) {
 
   const isDone = task.status === "done";
@@ -1972,7 +1974,7 @@ function TaskRow({
         isUrgent ? "border-red-500/60 shadow-[0_0_0_1px_rgba(239,68,68,0.35)]" : "border-border"
       }`}
     >
-      {selectMode && (
+      {selectMode && !readOnly && (
         <input
           type="checkbox"
           checked={selected}
@@ -1981,23 +1983,24 @@ function TaskRow({
         />
       )}
       <button
-        onClick={onCycle}
+        onClick={readOnly ? undefined : onCycle}
+        disabled={readOnly}
         className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-xs transition ${
           isDone
             ? "border-transparent bg-[var(--stat-green)] text-white"
             : isCarry
               ? "border-transparent bg-orange-500 text-white"
               : "border-input bg-background"
-        }`}
+        } ${readOnly ? "cursor-default" : ""}`}
         aria-label="Cycle task status"
       >
         {isDone ? "✓" : isCarry ? "↻" : ""}
       </button>
       <div
-        className={`flex-1 cursor-pointer text-sm ${
+        className={`flex-1 text-sm ${readOnly ? "" : "cursor-pointer"} ${
           isDone ? "line-through text-muted-foreground" : ""
         }`}
-        onClick={onCycle}
+        onClick={readOnly ? undefined : onCycle}
       >
         <span>{task.title}</span>
         {task.isStreak && (
@@ -2030,13 +2033,15 @@ function TaskRow({
       <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${ptsBg}`}>
         {task.points}pt
       </span>
-      <button
-        onClick={onDelete}
-        aria-label="Delete task"
-        className="rounded-md p-1 text-muted-foreground transition hover:bg-accent hover:text-foreground"
-      >
-        🗑
-      </button>
+      {!readOnly && (
+        <button
+          onClick={onDelete}
+          aria-label="Delete task"
+          className="rounded-md p-1 text-muted-foreground transition hover:bg-accent hover:text-foreground"
+        >
+          🗑
+        </button>
+      )}
     </div>
   );
 }
@@ -2191,14 +2196,56 @@ function AddTaskForm({
    WEEK HISTORY DETAIL
    ========================================================================= */
 
+const HISTORY_PALETTE = [
+  "#EF4444",
+  "#F59E0B",
+  "#10B981",
+  "#3B82F6",
+  "#8B5CF6",
+  "#EC4899",
+  "#14B8A6",
+  "#6B7280",
+];
+
+/** Rebuilds a stored history day into the same shape the live board renders. */
+function historyDayToDayData(d: HistoryDay): DayData {
+  const labels: string[] = [];
+  for (const t of d.tasks) if (!labels.includes(t.sectionLabel)) labels.push(t.sectionLabel);
+  const sections: Section[] = labels.map((label, i) => ({
+    id: label,
+    label,
+    color: HISTORY_PALETTE[i % HISTORY_PALETTE.length],
+  }));
+  return {
+    date: d.date,
+    isoDate: new Date().toISOString(),
+    sections,
+    tasks: d.tasks.map((t, i) => ({
+      id: `hist-${i}`,
+      title: t.title,
+      points: t.points,
+      status: t.status,
+      sectionId: t.sectionLabel,
+    })),
+    notes: [],
+  };
+}
+
 function HistoryDetail({ week, onClose }: { week: WeekHistory; onClose: () => void }) {
+  const [activeDay, setActiveDay] = useState(1);
+  const days = week.days ?? [];
+  const dayData = days.length
+    ? historyDayToDayData(days[Math.min(activeDay, days.length) - 1])
+    : null;
+  const noop = () => {};
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4"
       onClick={onClose}
     >
       <div
-        className="mt-10 w-full max-w-2xl rounded-xl border border-border bg-card p-4 shadow-lg"
+        className="mt-10 w-full max-w-3xl rounded-xl border border-border bg-card p-4 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-start justify-between gap-3">
@@ -2208,7 +2255,7 @@ function HistoryDetail({ week, onClose }: { week: WeekHistory; onClose: () => vo
             </h3>
             <p className="text-xs text-muted-foreground">
               {week.taskPct}% tasks · {week.ptsPct}% points ({week.tasksDone}/
-              {week.tasksTotal} done)
+              {week.tasksTotal} done) · read-only
             </p>
           </div>
           <button
@@ -2218,51 +2265,61 @@ function HistoryDetail({ week, onClose }: { week: WeekHistory; onClose: () => vo
             ✕ Close
           </button>
         </div>
-        {!week.days?.length ? (
+
+        {!dayData ? (
           <p className="text-sm text-muted-foreground">
             No day-by-day detail was recorded for this week.
           </p>
         ) : (
-          <div className="space-y-4">
-            {week.days.map((d: HistoryDay, i: number) => {
-              const done = d.tasks.filter((t) => t.status === "done").length;
-              return (
-                <div key={i}>
-                  <h4 className="mb-1 text-sm font-semibold">
-                    Day {i + 1} · {d.date}{" "}
-                    <span className="text-[11px] font-normal text-muted-foreground">
-                      ({done}/{d.tasks.length})
-                    </span>
-                  </h4>
-                  <ul className="space-y-1">
-                    {d.tasks.map((t, j) => (
-                      <li
-                        key={j}
-                        className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1 text-xs"
-                      >
-                        <span>
-                          {t.status === "done" ? "✓" : t.status === "carry" ? "↻" : "•"}
-                        </span>
-                        <span
-                          className={`flex-1 ${
-                            t.status === "done" ? "line-through text-muted-foreground" : ""
-                          }`}
-                        >
-                          {t.title}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {t.sectionLabel}
-                        </span>
-                        <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-semibold">
-                          {t.points}pt
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
-          </div>
+          <>
+            {/* Day tabs — same layout as the live tracker */}
+            <div className="mb-4 flex flex-wrap gap-2">
+              {days.map((d, i) => {
+                const done = d.tasks.filter((t) => t.status === "done").length;
+                const pct = d.tasks.length ? done / d.tasks.length : 0;
+                const activeCls = activeDay === i + 1 ? "ring-2 ring-ring" : "";
+                let bg = "bg-secondary text-secondary-foreground";
+                if (pct === 1 && d.tasks.length > 0)
+                  bg = "bg-[var(--stat-green)] text-white";
+                else if (pct > 0) bg = "bg-amber-500 text-white";
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setActiveDay(i + 1)}
+                    className={`rounded-md px-3 py-2 text-xs font-medium transition ${bg} ${activeCls}`}
+                  >
+                    <div>Day {i + 1}</div>
+                    <div className="text-[10px] opacity-90">
+                      {d.date}
+                      {done > 0 ? ` · ${done}/${d.tasks.length}` : ""}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <DayPanel
+              day={dayData}
+              dayNumber={activeDay}
+              readOnly
+              selectMode={false}
+              setSelectMode={noop}
+              selected={new Set<string>()}
+              setSelected={noop}
+              onCycleTask={noop}
+              onDeleteTask={noop}
+              onBulkCarry={noop}
+              onBulkDelete={noop}
+              onBulkConvey={noop}
+              onAddNote={noop}
+              onNoteText={noop}
+              onNoteDone={noop}
+              onNoteCarry={noop}
+              onNoteDelete={noop}
+              onAddTask={noop}
+              streaks={{}}
+            />
+          </>
         )}
       </div>
     </div>
