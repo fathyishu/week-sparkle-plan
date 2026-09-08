@@ -1944,6 +1944,7 @@ function TaskRow({
   onToggleSelect,
   onCycle,
   onDelete,
+  readOnly = false,
 }: {
   task: Task;
   streak?: number;
@@ -1952,6 +1953,7 @@ function TaskRow({
   onToggleSelect: () => void;
   onCycle: () => void;
   onDelete: () => void;
+  readOnly?: boolean;
 }) {
 
   const isDone = task.status === "done";
