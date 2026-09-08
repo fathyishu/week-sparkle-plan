@@ -1997,10 +1997,10 @@ function TaskRow({
         {isDone ? "✓" : isCarry ? "↻" : ""}
       </button>
       <div
-        className={`flex-1 cursor-pointer text-sm ${
+        className={`flex-1 text-sm ${readOnly ? "" : "cursor-pointer"} ${
           isDone ? "line-through text-muted-foreground" : ""
         }`}
-        onClick={onCycle}
+        onClick={readOnly ? undefined : onCycle}
       >
         <span>{task.title}</span>
         {task.isStreak && (
