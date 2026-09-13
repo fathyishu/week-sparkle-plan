@@ -830,6 +830,13 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
   };
 
   const bulkDelete = () => {
+    if (
+      !confirm(
+        "Delete the selected tasks forever? This will completely erase this data. Are you sure?",
+      )
+    )
+      return;
+
     setState((s) => {
       const dIdx = activeDay - 1;
       const defIds = new Set(
