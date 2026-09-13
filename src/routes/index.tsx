@@ -56,11 +56,10 @@ import type {
   WeekHistory,
 } from "@/lib/types";
 import {
-  bumpStreak,
-  currentStreak,
+  dayKey,
   defsToCsv,
-  dropStreak,
   fmtDate,
+  streakForDef,
   materializeWeek,
   migrateState,
   parseDefsCsv,
