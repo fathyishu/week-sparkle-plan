@@ -759,6 +759,13 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
 
   /** Deleting a task removes its permanent definition too. */
   const deleteTask = (taskId: string) => {
+    if (
+      !confirm(
+        "Delete this task forever? This will completely erase this data. Are you sure?",
+      )
+    )
+      return;
+
     setState((s) => {
       const dIdx = activeDay - 1;
       const target = s.days[dIdx].tasks.find((t) => t.id === taskId);
@@ -823,6 +830,13 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
   };
 
   const bulkDelete = () => {
+    if (
+      !confirm(
+        "Delete the selected tasks forever? This will completely erase this data. Are you sure?",
+      )
+    )
+      return;
+
     setState((s) => {
       const dIdx = activeDay - 1;
       const defIds = new Set(
@@ -1119,7 +1133,105 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
     }
   };
 
+  const WEEKDAY_NAMES = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+
+  /** Permanently erase every recurring task that belongs to one weekday. */
+  const deleteDayTasks = () => {
+    const d = state.days[activeDay - 1];
+    const wd = weekdayOf(d.isoDate);
+    if (
+      !confirm(
+        `Delete all ${WEEKDAY_NAMES[wd]} tasks forever? This will completely erase this data. Are you sure?`,
+      )
+    )
+      return;
+    setState((s) => {
+      const dead = new Set(
+        s.taskDefs.filter((def) => def.weekday === wd).map((def) => def.id),
+      );
+      return {
+        ...s,
+        taskDefs: s.taskDefs.filter((def) => !dead.has(def.id)),
+        days: s.days.map((day) =>
+          weekdayOf(day.isoDate) === wd
+            ? { ...day, tasks: [] }
+            : { ...day, tasks: day.tasks.filter((t) => !(t.defId && dead.has(t.defId))) },
+        ),
+      };
+    });
+    setSelected(new Set());
+    setSelectMode(false);
+  };
+
+  /** Permanently erase every recurring task, for this and all future weeks. */
+  const deleteAllTasks = () => {
+    if (
+      !confirm(
+        "Delete every task in the tracker forever? This will completely erase this data. Are you sure?",
+      )
+    )
+      return;
+    setState((s) => ({
+      ...s,
+      taskDefs: [],
+      days: s.days.map((d) => ({ ...d, tasks: [] })),
+    }));
+    setSelected(new Set());
+    setSelectMode(false);
+  };
+
+  /* ---------- date correction (labels only, never touches tasks) ---------- */
+  const [dateEditOpen, setDateEditOpen] = useState(false);
+  const toInput = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate(),
+    ).padStart(2, "0")}`;
+  };
+
+  /** Relabels one day only; its tasks, notes and statuses stay attached. */
+  const editDayDate = (value: string) => {
+    if (!value) return;
+    const nd = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(nd.getTime())) return;
+    setState((s) => ({
+      ...s,
+      days: s.days.map((d, i) =>
+        i === activeDay - 1
+          ? { ...d, isoDate: nd.toISOString(), date: fmtDate(nd) }
+          : d,
+      ),
+    }));
+  };
+
+  /** Relabels the whole week by shifting every day equally. */
+  const editWeekStart = (value: string) => {
+    if (!value) return;
+    const nd = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(nd.getTime())) return;
+    setState((s) => {
+      const cur = new Date(s.days[0].isoDate);
+      cur.setHours(0, 0, 0, 0);
+      const delta = Math.round((nd.getTime() - cur.getTime()) / 86400000);
+      if (delta === 0) return s;
+      return {
+        ...s,
+        weekStartISO: nd.toISOString(),
+        days: shiftDays(s.days, delta),
+      };
+    });
+  };
+
   /* ---------- CSV export / import of permanent tasks ---------- */
+
   const exportCsv = () => {
     const csv = defsToCsv(state.taskDefs, sectionCatalog(state.days));
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
@@ -1368,6 +1480,64 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
             Past weeks open read-only; future weeks move the board.
           </span>
         </div>
+
+        {/* Edit dates — relabels only, never touches tasks */}
+        <div className="mb-3 rounded-lg border border-border bg-card p-2">
+          <button
+            onClick={() => setDateEditOpen((o) => !o)}
+            className="text-xs font-medium underline-offset-2 hover:underline"
+          >
+            ✏️ Edit dates
+          </button>
+          {dateEditOpen && (
+            <div className="mt-2 flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-2 text-xs">
+                Day {activeDay} date
+                <input
+                  type="date"
+                  value={toInput(state.days[activeDay - 1].isoDate)}
+                  onChange={(e) => editDayDate(e.target.value)}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-xs">
+                Week start date
+                <input
+                  type="date"
+                  value={toInput(state.days[0].isoDate)}
+                  onChange={(e) => editWeekStart(e.target.value)}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+                />
+              </label>
+              <span className="text-[11px] text-muted-foreground">
+                Only the labels change — tasks and completions stay put.
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Permanent deletion */}
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-2">
+          <span className="text-xs font-medium text-destructive">Danger zone</span>
+          <button
+            onClick={deleteDayTasks}
+            className="rounded-md border border-destructive/50 px-3 py-1.5 text-xs font-medium text-destructive transition hover:bg-destructive/10"
+          >
+            🗑 Delete all {WEEKDAY_NAMES[weekdayOf(state.days[activeDay - 1].isoDate)]}
+            ’s tasks
+          </button>
+          <button
+            onClick={deleteAllTasks}
+            className="rounded-md border border-destructive/50 px-3 py-1.5 text-xs font-medium text-destructive transition hover:bg-destructive/10"
+          >
+            🗑 Delete all tasks
+          </button>
+          <span className="text-[11px] text-muted-foreground">
+            Permanent — past weeks’ history is untouched.
+          </span>
+        </div>
+
+
 
         {/* Rollover */}
         <div className="mb-6 flex flex-wrap gap-2">
