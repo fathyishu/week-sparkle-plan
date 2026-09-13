@@ -1119,7 +1119,105 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
     }
   };
 
+  const WEEKDAY_NAMES = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+
+  /** Permanently erase every recurring task that belongs to one weekday. */
+  const deleteDayTasks = () => {
+    const d = state.days[activeDay - 1];
+    const wd = weekdayOf(d.isoDate);
+    if (
+      !confirm(
+        `Delete all ${WEEKDAY_NAMES[wd]} tasks forever? This will completely erase this data. Are you sure?`,
+      )
+    )
+      return;
+    setState((s) => {
+      const dead = new Set(
+        s.taskDefs.filter((def) => def.weekday === wd).map((def) => def.id),
+      );
+      return {
+        ...s,
+        taskDefs: s.taskDefs.filter((def) => !dead.has(def.id)),
+        days: s.days.map((day) =>
+          weekdayOf(day.isoDate) === wd
+            ? { ...day, tasks: [] }
+            : { ...day, tasks: day.tasks.filter((t) => !(t.defId && dead.has(t.defId))) },
+        ),
+      };
+    });
+    setSelected(new Set());
+    setSelectMode(false);
+  };
+
+  /** Permanently erase every recurring task, for this and all future weeks. */
+  const deleteAllTasks = () => {
+    if (
+      !confirm(
+        "Delete every task in the tracker forever? This will completely erase this data. Are you sure?",
+      )
+    )
+      return;
+    setState((s) => ({
+      ...s,
+      taskDefs: [],
+      days: s.days.map((d) => ({ ...d, tasks: [] })),
+    }));
+    setSelected(new Set());
+    setSelectMode(false);
+  };
+
+  /* ---------- date correction (labels only, never touches tasks) ---------- */
+  const [dateEditOpen, setDateEditOpen] = useState(false);
+  const toInput = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate(),
+    ).padStart(2, "0")}`;
+  };
+
+  /** Relabels one day only; its tasks, notes and statuses stay attached. */
+  const editDayDate = (value: string) => {
+    if (!value) return;
+    const nd = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(nd.getTime())) return;
+    setState((s) => ({
+      ...s,
+      days: s.days.map((d, i) =>
+        i === activeDay - 1
+          ? { ...d, isoDate: nd.toISOString(), date: fmtDate(nd) }
+          : d,
+      ),
+    }));
+  };
+
+  /** Relabels the whole week by shifting every day equally. */
+  const editWeekStart = (value: string) => {
+    if (!value) return;
+    const nd = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(nd.getTime())) return;
+    setState((s) => {
+      const cur = new Date(s.days[0].isoDate);
+      cur.setHours(0, 0, 0, 0);
+      const delta = Math.round((nd.getTime() - cur.getTime()) / 86400000);
+      if (delta === 0) return s;
+      return {
+        ...s,
+        weekStartISO: nd.toISOString(),
+        days: shiftDays(s.days, delta),
+      };
+    });
+  };
+
   /* ---------- CSV export / import of permanent tasks ---------- */
+
   const exportCsv = () => {
     const csv = defsToCsv(state.taskDefs, sectionCatalog(state.days));
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
