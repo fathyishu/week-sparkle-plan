@@ -759,6 +759,13 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
 
   /** Deleting a task removes its permanent definition too. */
   const deleteTask = (taskId: string) => {
+    if (
+      !confirm(
+        "Delete this task forever? This will completely erase this data. Are you sure?",
+      )
+    )
+      return;
+
     setState((s) => {
       const dIdx = activeDay - 1;
       const target = s.days[dIdx].tasks.find((t) => t.id === taskId);
