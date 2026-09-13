@@ -1481,6 +1481,64 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
           </span>
         </div>
 
+        {/* Edit dates — relabels only, never touches tasks */}
+        <div className="mb-3 rounded-lg border border-border bg-card p-2">
+          <button
+            onClick={() => setDateEditOpen((o) => !o)}
+            className="text-xs font-medium underline-offset-2 hover:underline"
+          >
+            ✏️ Edit dates
+          </button>
+          {dateEditOpen && (
+            <div className="mt-2 flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-2 text-xs">
+                Day {activeDay} date
+                <input
+                  type="date"
+                  value={toInput(state.days[activeDay - 1].isoDate)}
+                  onChange={(e) => editDayDate(e.target.value)}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-xs">
+                Week start date
+                <input
+                  type="date"
+                  value={toInput(state.days[0].isoDate)}
+                  onChange={(e) => editWeekStart(e.target.value)}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+                />
+              </label>
+              <span className="text-[11px] text-muted-foreground">
+                Only the labels change — tasks and completions stay put.
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Permanent deletion */}
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-2">
+          <span className="text-xs font-medium text-destructive">Danger zone</span>
+          <button
+            onClick={deleteDayTasks}
+            className="rounded-md border border-destructive/50 px-3 py-1.5 text-xs font-medium text-destructive transition hover:bg-destructive/10"
+          >
+            🗑 Delete all {WEEKDAY_NAMES[weekdayOf(state.days[activeDay - 1].isoDate)]}
+            ’s tasks
+          </button>
+          <button
+            onClick={deleteAllTasks}
+            className="rounded-md border border-destructive/50 px-3 py-1.5 text-xs font-medium text-destructive transition hover:bg-destructive/10"
+          >
+            🗑 Delete all tasks
+          </button>
+          <span className="text-[11px] text-muted-foreground">
+            Permanent — past weeks’ history is untouched.
+          </span>
+        </div>
+
+
+
         {/* Rollover */}
         <div className="mb-6 flex flex-wrap gap-2">
           <button
