@@ -11,7 +11,13 @@ export const uid = () => Math.random().toString(36).slice(2, 11);
 
 export const weekdayOf = (isoDate: string) => new Date(isoDate).getDay();
 
-export const dayKey = (isoDate: string) => new Date(isoDate).toISOString().slice(0, 10);
+/** Local calendar key (yyyy-mm-dd). Using UTC here shifts the day for most users. */
+export const dayKey = (isoDate: string) => {
+  const d = new Date(isoDate);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+};
 
 export const fmtDate = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}`;
 
