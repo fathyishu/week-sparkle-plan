@@ -11,7 +11,13 @@ export const uid = () => Math.random().toString(36).slice(2, 11);
 
 export const weekdayOf = (isoDate: string) => new Date(isoDate).getDay();
 
-export const dayKey = (isoDate: string) => new Date(isoDate).toISOString().slice(0, 10);
+/** Local calendar key (yyyy-mm-dd). Using UTC here shifts the day for most users. */
+export const dayKey = (isoDate: string) => {
+  const d = new Date(isoDate);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+};
 
 export const fmtDate = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}`;
 
@@ -256,4 +262,35 @@ export function parseDefsCsv(text: string): ParsedDefRow[] {
     });
   }
   return rows;
+}
+
+/* ---------------- streak derived from actual day data ---------------- */
+
+function prevDayKey(key: string): string {
+  return new Date(Date.parse(`${key}T00:00:00Z`) - 86400000).toISOString().slice(0, 10);
+}
+
+/**
+ * The streak for a definition as of the day cell at `dayIdx`:
+ * consecutive completed days ending yesterday, +1 when today is done.
+ * `carry` extends the chain across the week boundary.
+ */
+export function streakForDef(
+  days: DayData[],
+  defId: string,
+  dayIdx: number,
+  carry?: { count: number; lastDoneDate?: string },
+): number {
+  let base = 0;
+  let i = dayIdx - 1;
+  for (; i >= 0; i--) {
+    const t = days[i].tasks.find((x) => x.defId === defId);
+    if (t && t.status === "done") base += 1;
+    else break;
+  }
+  if (i < 0 && carry?.lastDoneDate && carry.count > 0 && days.length) {
+    if (carry.lastDoneDate === prevDayKey(dayKey(days[0].isoDate))) base += carry.count;
+  }
+  const today = days[dayIdx]?.tasks.find((x) => x.defId === defId);
+  return today?.status === "done" ? base + 1 : base;
 }
