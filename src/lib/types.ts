@@ -9,6 +9,8 @@ export interface TaskDef {
   sectionId: string;
   weekday: number; // 0=Sun..6=Sat
   isStreak?: boolean;
+  /** Shared by all weekday defs of one streak task (a daily streak has 7 defs). */
+  streakKey?: string;
   badges?: BadgeType[];
 }
 
@@ -24,6 +26,8 @@ export interface Task {
   /** Links this instance back to its permanent TaskDef */
   defId?: string;
   isStreak?: boolean;
+  /** Copied from the TaskDef; streak matching uses this across days. */
+  streakKey?: string;
 }
 
 export interface Section {

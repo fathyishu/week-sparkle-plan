@@ -63,6 +63,7 @@ export function materializeWeek(
         custom: true,
         defId: def.id,
         isStreak: def.isStreak,
+        streakKey: def.streakKey,
       }));
       tasks = [...tasks, ...added];
       for (const def of wanted) {
@@ -277,20 +278,73 @@ function prevDayKey(key: string): string {
  */
 export function streakForDef(
   days: DayData[],
-  defId: string,
+  key: string,
   dayIdx: number,
   carry?: { count: number; lastDoneDate?: string },
 ): number {
+  // A daily streak task has one def per weekday — match instances by the
+  // shared streakKey (falling back to defId for legacy data).
+  const matches = (x: Task) => (x.streakKey ?? x.defId) === key;
   let base = 0;
   let i = dayIdx - 1;
   for (; i >= 0; i--) {
-    const t = days[i].tasks.find((x) => x.defId === defId);
+    const t = days[i].tasks.find(matches);
     if (t && t.status === "done") base += 1;
     else break;
   }
   if (i < 0 && carry?.lastDoneDate && carry.count > 0 && days.length) {
     if (carry.lastDoneDate === prevDayKey(dayKey(days[0].isoDate))) base += carry.count;
   }
-  const today = days[dayIdx]?.tasks.find((x) => x.defId === defId);
+  const today = days[dayIdx]?.tasks.find(matches);
   return today?.status === "done" ? base + 1 : base;
+}
+
+/**
+ * One-time repair for streak defs saved before streakKey existed:
+ * defs that are the same task on different weekdays (same title/section/points)
+ * get one shared streakKey, and existing day instances are tagged to match.
+ * Old per-def streak records are merged, keeping the latest chain.
+ */
+export function migrateStreakKeys<T extends TrackerState>(state: T): T {
+  const defs = state.taskDefs ?? [];
+  if (!defs.some((d) => d.isStreak && !d.streakKey)) {
+    // Still ensure instances carry the def's key.
+    if (!defs.some((d) => d.streakKey)) return state;
+  }
+  const groupKey = (d: TaskDef) => `${d.title}|${d.sectionId}|${d.points}`;
+  const keyByGroup = new Map<string, string>();
+  let changed = false;
+  const newDefs = defs.map((d) => {
+    if (!d.isStreak) return d;
+    if (d.streakKey) {
+      keyByGroup.set(groupKey(d), d.streakKey);
+      return d;
+    }
+    changed = true;
+    const g = groupKey(d);
+    if (!keyByGroup.has(g)) keyByGroup.set(g, uid());
+    return { ...d, streakKey: keyByGroup.get(g)! };
+  });
+  const keyByDefId = new Map(newDefs.map((d) => [d.id, d.streakKey]));
+  const days = state.days.map((day) => ({
+    ...day,
+    tasks: day.tasks.map((t) => {
+      const k = t.defId ? keyByDefId.get(t.defId) : undefined;
+      return k && t.streakKey !== k ? { ...t, streakKey: k } : t;
+    }),
+  }));
+  // Merge legacy per-def streak records into one per streakKey.
+  const streaks: Record<string, StreakInfo> = {};
+  for (const d of newDefs) {
+    if (!d.isStreak || !d.streakKey) continue;
+    const candidates = [state.streaks?.[d.streakKey], state.streaks?.[d.id]].filter(
+      Boolean,
+    ) as StreakInfo[];
+    const best = candidates
+      .filter((c) => c.count > 0 && c.lastDoneDate)
+      .sort((a, b) => (a.lastDoneDate! < b.lastDoneDate! ? 1 : -1))[0];
+    if (best) streaks[d.streakKey] = best;
+  }
+  if (!changed) return state;
+  return { ...state, taskDefs: newDefs, days, streaks };
 }
