@@ -2,6 +2,7 @@ import type {
   DayData,
   HistoryDay,
   Section,
+  StreakInfo,
   Task,
   TaskDef,
   TrackerState,
@@ -323,14 +324,17 @@ export function migrateStreakKeys<T extends TrackerState>(state: T): T {
     changed = true;
     const g = groupKey(d);
     if (!keyByGroup.has(g)) keyByGroup.set(g, uid());
-    return { ...d, streakKey: keyByGroup.get(g)! };
+    const streakKey = keyByGroup.get(g);
+    return streakKey ? { ...d, streakKey } : d;
   });
   const keyByDefId = new Map(newDefs.map((d) => [d.id, d.streakKey]));
   const days = state.days.map((day) => ({
     ...day,
     tasks: day.tasks.map((t) => {
       const k = t.defId ? keyByDefId.get(t.defId) : undefined;
-      return k && t.streakKey !== k ? { ...t, streakKey: k } : t;
+      if (!k || t.streakKey === k) return t;
+      changed = true;
+      return { ...t, streakKey: k };
     }),
   }));
   // Merge legacy per-def streak records into one per streakKey.
@@ -342,7 +346,7 @@ export function migrateStreakKeys<T extends TrackerState>(state: T): T {
     ) as StreakInfo[];
     const best = candidates
       .filter((c) => c.count > 0 && c.lastDoneDate)
-      .sort((a, b) => (a.lastDoneDate! < b.lastDoneDate! ? 1 : -1))[0];
+      .sort((a, b) => (a.lastDoneDate ?? "") < (b.lastDoneDate ?? "") ? 1 : -1)[0];
     if (best) streaks[d.streakKey] = best;
   }
   if (!changed) return state;
