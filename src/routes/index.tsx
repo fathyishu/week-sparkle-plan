@@ -64,6 +64,7 @@ import {
   streakForDef,
   materializeWeek,
   migrateState,
+  migrateStreakKeys,
   parseDefsCsv,
   resetWeekToPending,
   sectionCatalog,
@@ -419,14 +420,14 @@ function buildWeek(mondayISO: string, weekNumber: number): DayData[] {
 }
 
 function initialState(): AppState {
-  return migrateState({
+  return migrateStreakKeys(migrateState({
     weekStartISO: MONDAY_JUNE_16.toISOString(),
     weekNumber: 1,
     days: buildWeek(MONDAY_JUNE_16.toISOString(), 1),
     history: [],
     taskDefs: [],
     streaks: {},
-  });
+  }));
 }
 
 
@@ -504,7 +505,7 @@ function buildDemoWeek(mondayISO: string): DayData[] {
 }
 
 function buildDemoState(): AppState {
-  return migrateState({
+  return migrateStreakKeys(migrateState({
     weekStartISO: MONDAY_JUNE_16.toISOString(),
     weekNumber: 1,
     days: buildDemoWeek(MONDAY_JUNE_16.toISOString()),
@@ -512,7 +513,7 @@ function buildDemoState(): AppState {
     taskDefs: [],
     streaks: {},
     ui: { isDemo: true, demoBannerDismissed: false },
-  });
+  }));
 }
 
 
@@ -549,7 +550,7 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
     try {
       const raw = localStorage.getItem(`${STORAGE_KEY}:${syncUserId}`);
       if (raw) {
-        const parsed = migrateState(JSON.parse(raw) as AppState);
+        const parsed = migrateStreakKeys(migrateState(JSON.parse(raw) as AppState));
         setState({ ...parsed, days: materializeWeek(parsed, parsed.days) });
       } else setState(initialState());
     } catch {
@@ -558,13 +559,14 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
     setHydrated(true);
   }, [syncUserId]);
 
-  // Normalise anything arriving from the cloud that predates permanent tasks.
+  // Normalise anything arriving from the cloud that predates permanent tasks
+  // or the shared identity used by daily streaks.
   useEffect(() => {
     if (!hydrated) return;
     setState((s) => {
-      if (s.taskDefs && s.taskDefs.length) return s;
-      const m = migrateState(s);
-      return { ...m, days: materializeWeek(m, m.days) };
+      const migrated = migrateStreakKeys(migrateState(s));
+      if (migrated === s) return s;
+      return { ...migrated, days: materializeWeek(migrated, migrated.days) };
     });
   }, [hydrated, state]);
 
@@ -608,9 +610,10 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
     const out: Record<string, StreakInfo> = {};
     for (const def of state.taskDefs ?? []) {
       if (!def.isStreak) continue;
-      const carry = state.streaks?.[def.id];
+      const key = def.streakKey ?? def.id;
+      const carry = state.streaks?.[key];
       out[def.id] = {
-        count: streakForDef(state.days, def.id, activeDay - 1, carry),
+        count: streakForDef(state.days, key, activeDay - 1, carry),
         lastDoneDate: carry?.lastDoneDate,
       };
     }
@@ -752,10 +755,17 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
       // Streak bookkeeping
       let streaks = s.streaks ?? {};
       if (t.isStreak && t.defId) {
+        const streakKey = t.streakKey ?? t.defId;
         if (nextStatus === "done") {
-          streaks = { ...streaks, [t.defId]: bumpStreak(streaks[t.defId], d.isoDate) };
+          streaks = {
+            ...streaks,
+            [streakKey]: bumpStreak(streaks[streakKey], d.isoDate),
+          };
         } else if (prevStatus === "done") {
-          streaks = { ...streaks, [t.defId]: dropStreak(streaks[t.defId], d.isoDate) };
+          streaks = {
+            ...streaks,
+            [streakKey]: dropStreak(streaks[streakKey], d.isoDate),
+          };
         }
       }
 
@@ -947,6 +957,7 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
   }) => {
     setState((s) => {
       const targetIdxs = opts.daily ? [0, 1, 2, 3, 4, 5, 6] : [activeDay - 1];
+      const streakKey = opts.isStreak ? uid() : undefined;
       const newDefs: TaskDef[] = targetIdxs.map((i) => ({
         id: uid(),
         title: opts.title,
@@ -954,6 +965,7 @@ export function TrackerApp({ user, signOut, mentorMode }: TrackerProps) {
         sectionId: opts.sectionId,
         weekday: weekdayOf(s.days[i].isoDate),
         isStreak: opts.isStreak,
+        streakKey,
       }));
       const section: Section = {
         id: opts.sectionId,
