@@ -1622,6 +1622,9 @@ function GroupIndividual({ user, groupId }: { user: User; groupId: string }) {
   const [allTasks, setAllTasks] = useState<TaskRow[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [editing, setEditing] = useState<TaskRow | null>(null);
+  const [person, setPerson] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
 
   const load = async () => {
     const [{ data: tk }, { data: mem }] = await Promise.all([
