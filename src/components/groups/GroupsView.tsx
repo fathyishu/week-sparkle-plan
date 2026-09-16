@@ -1043,6 +1043,21 @@ function TaskModal({
               className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
             />
           </div>
+          <div className="col-span-2">
+            <label className="mb-1 block text-xs font-medium">Sprint (optional)</label>
+            <select
+              value={t.sprint_id ?? ""}
+              onChange={(e) => setT({ ...t, sprint_id: e.target.value || null })}
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            >
+              <option value="">No sprint</option>
+              {sprints.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.start_date} → {s.end_date})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         <div className="flex items-center justify-between pt-2">
           <button
