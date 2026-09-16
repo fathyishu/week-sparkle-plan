@@ -928,7 +928,18 @@ function TaskModal({
   onClose: () => void;
 }) {
   const [t, setT] = useState<TaskRow>(task);
+  const [sprints, setSprints] = useState<SprintRow[]>([]);
   void user;
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("group_sprints")
+        .select("*")
+        .eq("group_id", task.group_id)
+        .order("start_date");
+      setSprints((data ?? []) as SprintRow[]);
+    })();
+  }, [task.group_id]);
   const save = async () => {
     await supabase
       .from("group_tasks")
@@ -940,6 +951,7 @@ function TaskModal({
         pts: t.pts,
         due_date: t.due_date,
         status: t.status,
+        sprint_id: t.sprint_id,
       })
       .eq("id", t.id);
     onClose();
