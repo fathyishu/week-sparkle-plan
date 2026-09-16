@@ -1608,6 +1608,21 @@ function AddTaskModal({
               className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
             />
           </div>
+          <div className="col-span-2">
+            <label className="mb-1 block text-xs font-medium">Sprint (optional)</label>
+            <select
+              value={sprintId}
+              onChange={(e) => setSprintId(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            >
+              <option value="">No sprint</option>
+              {sprints.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.start_date} → {s.end_date})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <button onClick={onClose} className="rounded-md border border-border px-3 py-1.5 text-sm">
