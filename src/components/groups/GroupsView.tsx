@@ -1470,11 +1470,13 @@ function AddTaskModal({
   user,
   groupId,
   initialStatus = "todo",
+  defaultSprintId = "",
   onClose,
 }: {
   user: User;
   groupId: string;
   initialStatus?: TaskRow["status"];
+  defaultSprintId?: string;
   onClose: () => void;
 }) {
   const [title, setTitle] = useState("");
@@ -1485,17 +1487,25 @@ function AddTaskModal({
   const [pts, setPts] = useState(5);
   const [dueDate, setDueDate] = useState("");
   const [members, setMembers] = useState<MemberRow[]>([]);
+  const [sprints, setSprints] = useState<SprintRow[]>([]);
+  const [sprintId, setSprintId] = useState(defaultSprintId);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("group_members")
-        .select("*")
-        .eq("group_id", groupId);
+      const [{ data }, { data: sp }] = await Promise.all([
+        supabase.from("group_members").select("*").eq("group_id", groupId),
+        supabase
+          .from("group_sprints")
+          .select("*")
+          .eq("group_id", groupId)
+          .order("start_date"),
+      ]);
       setMembers((data ?? []) as MemberRow[]);
+      setSprints((sp ?? []) as SprintRow[]);
     })();
   }, [groupId]);
+
 
   const submit = async () => {
     if (!title.trim()) return;
