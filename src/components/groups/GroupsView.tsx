@@ -593,7 +593,7 @@ function GroupDetail({
         )}
       </div>
       <div className="mb-4 flex gap-1 border-b border-border">
-        {(["tasks", "members", "sections", "leaderboard"] as const).map((t) => (
+        {(["tasks", "sprints", "members", "sections", "leaderboard"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
