@@ -495,7 +495,10 @@ function GroupDetail({
   isOwner: boolean;
   onBack: () => void;
 }) {
-  const [tab, setTab] = useState<"tasks" | "members" | "sections" | "leaderboard">("tasks");
+  const [tab, setTab] = useState<
+    "tasks" | "sprints" | "members" | "sections" | "leaderboard"
+  >("tasks");
+
   const [taskMode, setTaskMode] = useState<"individual" | "board">("individual");
   const [showInvite, setShowInvite] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
