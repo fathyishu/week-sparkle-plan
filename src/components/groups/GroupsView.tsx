@@ -1521,6 +1521,7 @@ function AddTaskModal({
       priority,
       due_date: dueDate || null,
       position: 0,
+      sprint_id: sprintId || null,
     });
     setBusy(false);
     if (error) {
