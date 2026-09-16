@@ -613,6 +613,7 @@ function GroupDetail({
       {tab === "tasks" && taskMode === "individual" && (
         <GroupIndividual user={user} groupId={groupId} />
       )}
+      {tab === "sprints" && <SprintsSection user={user} groupId={groupId} />}
       {tab === "members" && <GroupMembers user={user} groupId={groupId} isOwner={isOwner} />}
       {tab === "sections" && <GroupSections groupId={groupId} isOwner={isOwner} />}
       {tab === "leaderboard" && <GroupLeaderboard user={user} groupId={groupId} />}
