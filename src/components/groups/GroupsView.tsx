@@ -1651,7 +1651,10 @@ function GroupIndividual({ user, groupId }: { user: User; groupId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
 
-  const tasks = allTasks.filter((t) => !t.due_date || inRange(t.due_date, range));
+  const tasks = allTasks.filter(
+    (t) =>
+      (!t.due_date || inRange(t.due_date, range)) && matchSimple(t, person, from, to),
+  );
 
   const cycle = async (t: TaskRow) => {
     const next: TaskRow["status"] =
