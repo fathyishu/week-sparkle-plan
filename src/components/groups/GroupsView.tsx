@@ -691,7 +691,10 @@ function GroupBoard({ user, groupId }: { user: User; groupId: string }) {
     { key: "done", label: "✅ Done" },
   ];
 
-  const visibleTasks = tasks.filter((t) => !t.due_date || inRange(t.due_date, range));
+  const visibleTasks = tasks.filter(
+    (t) =>
+      (!t.due_date || inRange(t.due_date, range)) && matchSimple(t, person, from, to),
+  );
 
   const onDragEnd = async (e: DragEndEvent) => {
     const taskId = e.active.id as string;
