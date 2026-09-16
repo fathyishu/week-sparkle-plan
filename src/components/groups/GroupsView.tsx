@@ -743,7 +743,16 @@ function GroupBoard({ user, groupId }: { user: User; groupId: string }) {
         </div>
       )}
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-muted-foreground">Filter tasks by due date:</span>
+        <span className="text-xs font-medium text-muted-foreground">Filter:</span>
+        <SimpleFilters
+          members={members}
+          person={person}
+          setPerson={setPerson}
+          from={from}
+          setFrom={setFrom}
+          to={to}
+          setTo={setTo}
+        />
         {control}
       </div>
       <div className="grid gap-3 md:grid-cols-3">
