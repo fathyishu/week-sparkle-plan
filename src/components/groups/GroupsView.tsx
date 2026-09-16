@@ -56,8 +56,96 @@ type TaskRow = {
   due_date: string | null;
   position: number;
   section_id: string | null;
+  sprint_id: string | null;
   deleted: boolean;
 };
+
+type SprintRow = {
+  id: string;
+  group_id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  created_by: string;
+};
+
+/** Shared simple filters: by person + due-date from/to. */
+function matchSimple(
+  t: TaskRow,
+  person: string,
+  from: string,
+  to: string,
+): boolean {
+  if (person && t.assigned_to !== person) return false;
+  if (from || to) {
+    if (!t.due_date) return false;
+    if (from && t.due_date < from) return false;
+    if (to && t.due_date > to) return false;
+  }
+  return true;
+}
+
+function SimpleFilters({
+  members,
+  person,
+  setPerson,
+  from,
+  setFrom,
+  to,
+  setTo,
+}: {
+  members: MemberRow[];
+  person: string;
+  setPerson: (v: string) => void;
+  from: string;
+  setFrom: (v: string) => void;
+  to: string;
+  setTo: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <select
+        value={person}
+        onChange={(e) => setPerson(e.target.value)}
+        className="rounded-md border border-border bg-background px-2 py-1.5"
+      >
+        <option value="">All people</option>
+        {members.map((m) => (
+          <option key={m.id} value={m.user_id}>
+            {m.display_name ?? m.email}
+          </option>
+        ))}
+      </select>
+      <label className="text-muted-foreground">Due from</label>
+      <input
+        type="date"
+        value={from}
+        onChange={(e) => setFrom(e.target.value)}
+        className="rounded-md border border-border bg-background px-2 py-1.5"
+      />
+      <label className="text-muted-foreground">to</label>
+      <input
+        type="date"
+        value={to}
+        onChange={(e) => setTo(e.target.value)}
+        className="rounded-md border border-border bg-background px-2 py-1.5"
+      />
+      {(person || from || to) && (
+        <button
+          onClick={() => {
+            setPerson("");
+            setFrom("");
+            setTo("");
+          }}
+          className="rounded-md border border-border px-2 py-1.5 hover:bg-muted"
+        >
+          Clear
+        </button>
+      )}
+    </div>
+  );
+}
+
 
 type SectionRow = {
   id: string;
