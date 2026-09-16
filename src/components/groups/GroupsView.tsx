@@ -56,8 +56,96 @@ type TaskRow = {
   due_date: string | null;
   position: number;
   section_id: string | null;
+  sprint_id: string | null;
   deleted: boolean;
 };
+
+type SprintRow = {
+  id: string;
+  group_id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  created_by: string;
+};
+
+/** Shared simple filters: by person + due-date from/to. */
+function matchSimple(
+  t: TaskRow,
+  person: string,
+  from: string,
+  to: string,
+): boolean {
+  if (person && t.assigned_to !== person) return false;
+  if (from || to) {
+    if (!t.due_date) return false;
+    if (from && t.due_date < from) return false;
+    if (to && t.due_date > to) return false;
+  }
+  return true;
+}
+
+function SimpleFilters({
+  members,
+  person,
+  setPerson,
+  from,
+  setFrom,
+  to,
+  setTo,
+}: {
+  members: MemberRow[];
+  person: string;
+  setPerson: (v: string) => void;
+  from: string;
+  setFrom: (v: string) => void;
+  to: string;
+  setTo: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <select
+        value={person}
+        onChange={(e) => setPerson(e.target.value)}
+        className="rounded-md border border-border bg-background px-2 py-1.5"
+      >
+        <option value="">All people</option>
+        {members.map((m) => (
+          <option key={m.id} value={m.user_id}>
+            {m.display_name ?? m.email}
+          </option>
+        ))}
+      </select>
+      <label className="text-muted-foreground">Due from</label>
+      <input
+        type="date"
+        value={from}
+        onChange={(e) => setFrom(e.target.value)}
+        className="rounded-md border border-border bg-background px-2 py-1.5"
+      />
+      <label className="text-muted-foreground">to</label>
+      <input
+        type="date"
+        value={to}
+        onChange={(e) => setTo(e.target.value)}
+        className="rounded-md border border-border bg-background px-2 py-1.5"
+      />
+      {(person || from || to) && (
+        <button
+          onClick={() => {
+            setPerson("");
+            setFrom("");
+            setTo("");
+          }}
+          className="rounded-md border border-border px-2 py-1.5 hover:bg-muted"
+        >
+          Clear
+        </button>
+      )}
+    </div>
+  );
+}
+
 
 type SectionRow = {
   id: string;
@@ -407,7 +495,10 @@ function GroupDetail({
   isOwner: boolean;
   onBack: () => void;
 }) {
-  const [tab, setTab] = useState<"tasks" | "members" | "sections" | "leaderboard">("tasks");
+  const [tab, setTab] = useState<
+    "tasks" | "sprints" | "members" | "sections" | "leaderboard"
+  >("tasks");
+
   const [taskMode, setTaskMode] = useState<"individual" | "board">("individual");
   const [showInvite, setShowInvite] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
@@ -502,7 +593,7 @@ function GroupDetail({
         )}
       </div>
       <div className="mb-4 flex gap-1 border-b border-border">
-        {(["tasks", "members", "sections", "leaderboard"] as const).map((t) => (
+        {(["tasks", "sprints", "members", "sections", "leaderboard"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -522,6 +613,7 @@ function GroupDetail({
       {tab === "tasks" && taskMode === "individual" && (
         <GroupIndividual user={user} groupId={groupId} />
       )}
+      {tab === "sprints" && <SprintsSection user={user} groupId={groupId} />}
       {tab === "members" && <GroupMembers user={user} groupId={groupId} isOwner={isOwner} />}
       {tab === "sections" && <GroupSections groupId={groupId} isOwner={isOwner} />}
       {tab === "leaderboard" && <GroupLeaderboard user={user} groupId={groupId} />}
@@ -553,6 +645,9 @@ function GroupBoard({ user, groupId }: { user: User; groupId: string }) {
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [editing, setEditing] = useState<TaskRow | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [person, setPerson] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
 
   const load = async () => {
     const [{ data: tk }, { data: mem }] = await Promise.all([
@@ -599,7 +694,10 @@ function GroupBoard({ user, groupId }: { user: User; groupId: string }) {
     { key: "done", label: "✅ Done" },
   ];
 
-  const visibleTasks = tasks.filter((t) => !t.due_date || inRange(t.due_date, range));
+  const visibleTasks = tasks.filter(
+    (t) =>
+      (!t.due_date || inRange(t.due_date, range)) && matchSimple(t, person, from, to),
+  );
 
   const onDragEnd = async (e: DragEndEvent) => {
     const taskId = e.active.id as string;
@@ -651,7 +749,16 @@ function GroupBoard({ user, groupId }: { user: User; groupId: string }) {
         </div>
       )}
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-muted-foreground">Filter tasks by due date:</span>
+        <span className="text-xs font-medium text-muted-foreground">Filter:</span>
+        <SimpleFilters
+          members={members}
+          person={person}
+          setPerson={setPerson}
+          from={from}
+          setFrom={setFrom}
+          to={to}
+          setTo={setTo}
+        />
         {control}
       </div>
       <div className="grid gap-3 md:grid-cols-3">
@@ -821,7 +928,18 @@ function TaskModal({
   onClose: () => void;
 }) {
   const [t, setT] = useState<TaskRow>(task);
+  const [sprints, setSprints] = useState<SprintRow[]>([]);
   void user;
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("group_sprints")
+        .select("*")
+        .eq("group_id", task.group_id)
+        .order("start_date");
+      setSprints((data ?? []) as SprintRow[]);
+    })();
+  }, [task.group_id]);
   const save = async () => {
     await supabase
       .from("group_tasks")
@@ -833,6 +951,7 @@ function TaskModal({
         pts: t.pts,
         due_date: t.due_date,
         status: t.status,
+        sprint_id: t.sprint_id,
       })
       .eq("id", t.id);
     onClose();
@@ -923,6 +1042,21 @@ function TaskModal({
               onChange={(e) => setT({ ...t, due_date: e.target.value || null })}
               className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
             />
+          </div>
+          <div className="col-span-2">
+            <label className="mb-1 block text-xs font-medium">Sprint (optional)</label>
+            <select
+              value={t.sprint_id ?? ""}
+              onChange={(e) => setT({ ...t, sprint_id: e.target.value || null })}
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            >
+              <option value="">No sprint</option>
+              {sprints.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.start_date} → {s.end_date})
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         <div className="flex items-center justify-between pt-2">
@@ -1363,11 +1497,13 @@ function AddTaskModal({
   user,
   groupId,
   initialStatus = "todo",
+  defaultSprintId = "",
   onClose,
 }: {
   user: User;
   groupId: string;
   initialStatus?: TaskRow["status"];
+  defaultSprintId?: string;
   onClose: () => void;
 }) {
   const [title, setTitle] = useState("");
@@ -1378,17 +1514,25 @@ function AddTaskModal({
   const [pts, setPts] = useState(5);
   const [dueDate, setDueDate] = useState("");
   const [members, setMembers] = useState<MemberRow[]>([]);
+  const [sprints, setSprints] = useState<SprintRow[]>([]);
+  const [sprintId, setSprintId] = useState(defaultSprintId);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("group_members")
-        .select("*")
-        .eq("group_id", groupId);
+      const [{ data }, { data: sp }] = await Promise.all([
+        supabase.from("group_members").select("*").eq("group_id", groupId),
+        supabase
+          .from("group_sprints")
+          .select("*")
+          .eq("group_id", groupId)
+          .order("start_date"),
+      ]);
       setMembers((data ?? []) as MemberRow[]);
+      setSprints((sp ?? []) as SprintRow[]);
     })();
   }, [groupId]);
+
 
   const submit = async () => {
     if (!title.trim()) return;
@@ -1404,6 +1548,7 @@ function AddTaskModal({
       priority,
       due_date: dueDate || null,
       position: 0,
+      sprint_id: sprintId || null,
     });
     setBusy(false);
     if (error) {
@@ -1490,6 +1635,21 @@ function AddTaskModal({
               className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
             />
           </div>
+          <div className="col-span-2">
+            <label className="mb-1 block text-xs font-medium">Sprint (optional)</label>
+            <select
+              value={sprintId}
+              onChange={(e) => setSprintId(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            >
+              <option value="">No sprint</option>
+              {sprints.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.start_date} → {s.end_date})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <button onClick={onClose} className="rounded-md border border-border px-3 py-1.5 text-sm">
@@ -1515,6 +1675,9 @@ function GroupIndividual({ user, groupId }: { user: User; groupId: string }) {
   const [allTasks, setAllTasks] = useState<TaskRow[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [editing, setEditing] = useState<TaskRow | null>(null);
+  const [person, setPerson] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
 
   const load = async () => {
     const [{ data: tk }, { data: mem }] = await Promise.all([
@@ -1541,7 +1704,10 @@ function GroupIndividual({ user, groupId }: { user: User; groupId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
 
-  const tasks = allTasks.filter((t) => !t.due_date || inRange(t.due_date, range));
+  const tasks = allTasks.filter(
+    (t) =>
+      (!t.due_date || inRange(t.due_date, range)) && matchSimple(t, person, from, to),
+  );
 
   const cycle = async (t: TaskRow) => {
     const next: TaskRow["status"] =
@@ -1569,7 +1735,16 @@ function GroupIndividual({ user, groupId }: { user: User; groupId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-muted-foreground">Filter tasks by due date:</span>
+        <span className="text-xs font-medium text-muted-foreground">Filter:</span>
+        <SimpleFilters
+          members={members}
+          person={person}
+          setPerson={setPerson}
+          from={from}
+          setFrom={setFrom}
+          to={to}
+          setTo={setTo}
+        />
         {control}
       </div>
       <div className="flex items-center justify-between rounded-lg border border-border bg-card p-3 text-sm">

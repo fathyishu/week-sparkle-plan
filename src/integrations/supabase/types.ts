@@ -284,6 +284,44 @@ export type Database = {
           },
         ]
       }
+      group_sprints: {
+        Row: {
+          created_at: string
+          created_by: string
+          end_date: string
+          group_id: string
+          id: string
+          name: string
+          start_date: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          end_date: string
+          group_id: string
+          id?: string
+          name: string
+          start_date: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          end_date?: string
+          group_id?: string
+          id?: string
+          name?: string
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_sprints_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_tasks: {
         Row: {
           assigned_to: string | null
@@ -298,6 +336,7 @@ export type Database = {
           priority: string
           pts: number
           section_id: string | null
+          sprint_id: string | null
           status: string
           title: string
           updated_at: string
@@ -315,6 +354,7 @@ export type Database = {
           priority?: string
           pts?: number
           section_id?: string | null
+          sprint_id?: string | null
           status?: string
           title: string
           updated_at?: string
@@ -332,6 +372,7 @@ export type Database = {
           priority?: string
           pts?: number
           section_id?: string | null
+          sprint_id?: string | null
           status?: string
           title?: string
           updated_at?: string
@@ -342,6 +383,13 @@ export type Database = {
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_tasks_sprint_id_fkey"
+            columns: ["sprint_id"]
+            isOneToOne: false
+            referencedRelation: "group_sprints"
             referencedColumns: ["id"]
           },
         ]
