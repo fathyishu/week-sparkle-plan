@@ -1682,7 +1682,16 @@ function GroupIndividual({ user, groupId }: { user: User; groupId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-muted-foreground">Filter tasks by due date:</span>
+        <span className="text-xs font-medium text-muted-foreground">Filter:</span>
+        <SimpleFilters
+          members={members}
+          person={person}
+          setPerson={setPerson}
+          from={from}
+          setFrom={setFrom}
+          to={to}
+          setTo={setTo}
+        />
         {control}
       </div>
       <div className="flex items-center justify-between rounded-lg border border-border bg-card p-3 text-sm">
