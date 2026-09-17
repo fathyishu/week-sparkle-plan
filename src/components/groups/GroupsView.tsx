@@ -1860,3 +1860,405 @@ function GroupIndividual({ user, groupId }: { user: User; groupId: string }) {
     </div>
   );
 }
+
+/* ==================================================================
+   SPRINTS
+   ================================================================== */
+function SprintsSection({ user, groupId }: { user: User; groupId: string }) {
+  const [sprints, setSprints] = useState<SprintRow[]>([]);
+  const [members, setMembers] = useState<MemberRow[]>([]);
+  const [open, setOpen] = useState<SprintRow | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    const [{ data: sp }, { data: ms }] = await Promise.all([
+      supabase
+        .from("group_sprints")
+        .select("*")
+        .eq("group_id", groupId)
+        .order("start_date"),
+      supabase.from("group_members").select("*").eq("group_id", groupId),
+    ]);
+    setSprints((sp ?? []) as SprintRow[]);
+    setMembers((ms ?? []) as MemberRow[]);
+    setLoading(false);
+  }, [groupId]);
+
+  useEffect(() => {
+    load();
+    const ch = supabase
+      .channel(`sprints:${groupId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "group_sprints" },
+        load,
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [groupId, load]);
+
+  // Group sprints by month of their start date — simple calendar-style layout.
+  const byMonth = useMemo(() => {
+    const map = new Map<string, SprintRow[]>();
+    for (const s of sprints) {
+      const key = s.start_date.slice(0, 7);
+      const arr = map.get(key) ?? [];
+      arr.push(s);
+      map.set(key, arr);
+    }
+    return [...map.entries()];
+  }, [sprints]);
+
+  if (open) {
+    return (
+      <SprintDetail
+        user={user}
+        groupId={groupId}
+        sprint={open}
+        members={members}
+        onBack={() => setOpen(null)}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold">Sprints</h3>
+        <button
+          onClick={() => setCreating(true)}
+          className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+        >
+          New Sprint
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="text-xs text-muted-foreground">Loading…</div>
+      ) : sprints.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+          No sprints yet. Create one to start planning.
+        </div>
+      ) : (
+        byMonth.map(([month, list]) => (
+          <div key={month} className="space-y-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {monthLabel(month)}
+            </div>
+            <div className="space-y-2">
+              {list.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setOpen(s)}
+                  className="w-full rounded-lg border border-border bg-card p-3 text-left transition-colors hover:bg-muted"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium">{s.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {s.start_date} → {s.end_date}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
+                    <div
+                      className="h-1.5 rounded-full bg-primary"
+                      style={barStyle(s)}
+                    />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+
+      {creating && (
+        <NewSprintModal
+          user={user}
+          groupId={groupId}
+          onClose={() => {
+            setCreating(false);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function monthLabel(ym: string) {
+  const [y, m] = ym.split("-");
+  const d = new Date(Number(y), Number(m) - 1, 1);
+  return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+}
+
+/** Width/offset of the sprint bar within its start month. */
+function barStyle(s: SprintRow): React.CSSProperties {
+  const start = new Date(`${s.start_date}T00:00:00`);
+  const end = new Date(`${s.end_date}T00:00:00`);
+  const daysInMonth = new Date(
+    start.getFullYear(),
+    start.getMonth() + 1,
+    0,
+  ).getDate();
+  const startDay = start.getDate();
+  const span = Math.max(
+    1,
+    Math.round((end.getTime() - start.getTime()) / 86400000) + 1,
+  );
+  const left = ((startDay - 1) / daysInMonth) * 100;
+  const width = Math.min(100 - left, (span / daysInMonth) * 100);
+  return { marginLeft: `${left}%`, width: `${Math.max(width, 4)}%` };
+}
+
+function NewSprintModal({
+  user,
+  groupId,
+  onClose,
+}: {
+  user: User;
+  groupId: string;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const create = async () => {
+    if (!name.trim() || !start || !end) return;
+    setSaving(true);
+    await supabase.from("group_sprints").insert({
+      group_id: groupId,
+      name: name.trim(),
+      start_date: start,
+      end_date: end,
+      created_by: user.id,
+    });
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <Modal title="New Sprint" onClose={onClose}>
+      <div className="space-y-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium">Name</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Sprint 1"
+            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium">Start date</label>
+            <input
+              type="date"
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium">End date</label>
+            <input
+              type="date"
+              value={end}
+              onChange={(e) => setEnd(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            onClick={onClose}
+            className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted"
+          >
+            Cancel
+          </button>
+          <button
+            disabled={saving || !name.trim() || !start || !end}
+            onClick={create}
+            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+          >
+            Create
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function SprintDetail({
+  user,
+  groupId,
+  sprint,
+  members,
+  onBack,
+}: {
+  user: User;
+  groupId: string;
+  sprint: SprintRow;
+  members: MemberRow[];
+  onBack: () => void;
+}) {
+  const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [person, setPerson] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<TaskRow | null>(null);
+
+  const load = useCallback(async () => {
+    const { data } = await supabase
+      .from("group_tasks")
+      .select("*")
+      .eq("group_id", groupId)
+      .eq("sprint_id", sprint.id)
+      .eq("deleted", false)
+      .order("position");
+    setTasks((data ?? []) as TaskRow[]);
+  }, [groupId, sprint.id]);
+
+  useEffect(() => {
+    load();
+    const ch = supabase
+      .channel(`sprint-tasks:${sprint.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "group_tasks" },
+        load,
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [sprint.id, load]);
+
+  // Strictly this sprint's tasks; filters only narrow within that scope.
+  const visible = tasks.filter((t) => matchSimple(t, person, from, to));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <button
+            onClick={onBack}
+            className="mb-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            ← All sprints
+          </button>
+          <h3 className="text-sm font-semibold">{sprint.name}</h3>
+          <div className="text-xs text-muted-foreground">
+            {sprint.start_date} → {sprint.end_date}
+          </div>
+        </div>
+        <button
+          onClick={() => setAdding(true)}
+          className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+        >
+          Add task
+        </button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground">Filter:</span>
+        <SimpleFilters
+          members={members}
+          person={person}
+          setPerson={setPerson}
+          from={from}
+          setFrom={setFrom}
+          to={to}
+          setTo={setTo}
+        />
+      </div>
+
+      {visible.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+          No tasks in this sprint{tasks.length > 0 ? " match the filters" : ""}.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {visible.map((t) => (
+            <div key={t.id} className="rounded-lg border border-border bg-card p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <button
+                    onClick={() => setEditing(t)}
+                    className="text-sm font-medium hover:underline"
+                  >
+                    {t.title}
+                  </button>
+                  {t.due_date && (
+                    <div className="text-[11px] text-muted-foreground">
+                      Due {t.due_date}
+                    </div>
+                  )}
+                </div>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase">
+                  {t.status}
+                </span>
+              </div>
+              <div className="mt-2 divide-y divide-border/60 border-t border-border/60">
+                {members.map((m) => {
+                  const assigned = t.assigned_to === m.user_id;
+                  const done = assigned && t.status === "done";
+                  return (
+                    <div
+                      key={m.id}
+                      className="flex items-center justify-between py-1 text-xs"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Avatar m={m} size={18} />
+                        {m.display_name ?? m.email}
+                      </span>
+                      <span
+                        className={
+                          done
+                            ? "text-green-500"
+                            : assigned
+                              ? "text-amber-500"
+                              : "text-muted-foreground"
+                        }
+                      >
+                        {done ? "Done" : assigned ? "Not done" : "—"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {adding && (
+        <AddTaskModal
+          user={user}
+          groupId={groupId}
+          defaultSprintId={sprint.id}
+          onClose={() => {
+            setAdding(false);
+            load();
+          }}
+        />
+      )}
+      {editing && (
+        <TaskModal
+          user={user}
+          task={editing}
+          members={members}
+          onClose={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
